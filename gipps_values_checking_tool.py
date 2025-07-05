@@ -440,11 +440,10 @@ class ValuesChecker:
         Main processing workflow - this is the primary entry point
         
         WOT IT DOES
-        1. Setup workspace and prepare input data
-        2. Create buffered versions of input data
-        3. Process each theme to find intersecting values
-        4. Apply mitigations to results
-        5. Generate output files
+        1. Setup workspace and prepare input data including buffered versions of features to check
+        2. Process each theme to find intersecting values
+        3. Apply mitigations to results
+        4. Generate output files
         6. Cleanup temporary data
         """
         try:
@@ -481,6 +480,7 @@ class ValuesChecker:
             return {'success': False, 'error': str(e)}
             
         finally:
+            # Phase 5: Clean up temporary files
             self._cleanup_temp_data()
     
     # ========================================================================
