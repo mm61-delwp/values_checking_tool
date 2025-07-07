@@ -152,22 +152,68 @@ class ValuesChecker:
         
         return working_copy
     
+    # def _create_all_buffers(self, input_data: str) -> Dict[str, str]:
+    #     """Create all required buffer distances for analysis"""
+    #     buffers = {}
+    #     buffer_names = []
+        
+    #     for buffer_name, distance in BUFFERS.items():
+    #         buffer_layer = f"buffer_{buffer_name}"
+    #         buffer_path = os.path.join(arcpy.env.workspace, buffer_layer)
+    #         if not arcpy.Exists(buffer_path):
+    #             arcpy.analysis.Buffer(input_data, buffer_layer, distance, "FULL", "ROUND", "NONE")
+    #         buffers[buffer_name] = buffer_layer
+    #         self.temp_datasets.append(buffer_layer)
+    #         self.logger.debug(f"Created {buffer_name} buffer")
+    #         buffer_names.append(buffer_name)
+        
+    #     self.logger.info(f"Buffers created at {', '.join(buffer_names)}")
+    #     return buffers
+    
     def _create_all_buffers(self, input_data: str) -> Dict[str, str]:
         """Create all required buffer distances for analysis"""
         buffers = {}
         buffer_names = []
         
-        for buffer_name, distance in BUFFERS.items():
+        # Process buffers in dependency order
+        for buffer_name, config in BUFFERS.items():
             buffer_layer = f"buffer_{buffer_name}"
             buffer_path = os.path.join(arcpy.env.workspace, buffer_layer)
+            
             if not arcpy.Exists(buffer_path):
-                arcpy.analysis.Buffer(input_data, buffer_layer, distance, "FULL", "ROUND", "NONE")
+                # Determine input features - are we buffering the original features or buffering an existing buffer?
+                input_features = config['input_features']
+                if input_features == "input_layer":
+                    arcpy.analysis.Buffer(
+                    in_features=input_data,
+                    out_feature_class=buffer_layer,
+                    buffer_distance_or_field=config['buffer_distance'],
+                    line_side="FULL",
+                    line_end_type="ROUND",
+                    dissolve_option="NONE",
+                    dissolve_field=None,
+                    method="PLANAR"
+                )
+                else:
+                    # Use previously created buffer
+                    input_path = os.path.join(arcpy.env.workspace, config['input_features'])
+                    arcpy.analysis.Buffer(
+                    in_features=input_path,
+                    out_feature_class=buffer_layer,
+                    buffer_distance_or_field=config['buffer_distance'],
+                    line_side="OUTSIDE_ONLY",
+                    line_end_type="ROUND",
+                    dissolve_option="NONE",
+                    dissolve_field=None,
+                    method="PLANAR"
+                )
+            
             buffers[buffer_name] = buffer_layer
             self.temp_datasets.append(buffer_layer)
-            self.logger.debug(f"Created {buffer_name} buffer")
+            self.logger.debug(f"Created {buffer_name} buffer with type {config['buffer_type']}")
             buffer_names.append(buffer_name)
         
-        self.logger.info(f"Buffers created at {', '.join(buffer_names)}")
+        self.logger.info(f"Buffers created: {', '.join(buffer_names)}")
         return buffers
     
     # ========================================================================
@@ -191,21 +237,33 @@ class ValuesChecker:
         
         # Process each dataset in the theme
         all_theme_results = []
+        # for dataset_name, config in theme_datasets.items():
+        #     try:
+        #         if self._is_dataset_enabled_for_mode(config):
+        #             dataset_results = self._process_single_dataset(dataset_name, config, buffered_layers, theme)
+        #             all_theme_results.extend(dataset_results)
+        #             self.logger.info(f"Processed {dataset_name}: {len(dataset_results)} values found")
+        #         else:
+        #             self.logger.info(f"Skipped {dataset_name} as it is disabled in {mode} mode")
+        #     except Exception as e:
+        #         self.logger.warning(f"Failed to process {dataset_name}: {e}")
+        
         for dataset_name, config in theme_datasets.items():
             try:
                 if self._is_dataset_enabled_for_mode(config):
-                    dataset_results = self._process_single_dataset(dataset_name, config, buffered_layers, theme)
-                    all_theme_results.extend(dataset_results)
-                    self.logger.info(f"Processed {dataset_name}: {len(dataset_results)} values found")
+                    for buffer in self._get_buffer_distance(config):
+                        dataset_results = self._process_single_dataset(dataset_name, config, buffer, buffered_layers, theme)
+                        all_theme_results.extend(dataset_results)
+                        self.logger.info(f"Processed {dataset_name} with {buffer} buffer: {len(dataset_results)} values found")
                 else:
                     self.logger.info(f"Skipped {dataset_name} as it is disabled in {mode} mode")
             except Exception as e:
                 self.logger.warning(f"Failed to process {dataset_name}: {e}")
-        
+
         return all_theme_results
     
     def _process_single_dataset(self, dataset_name: str, config: DatasetConfig, 
-                               buffered_layers: Dict[str, str], theme: str) -> List[Dict]:
+                               buffer_distance: str, buffered_layers: Dict[str, str], theme: str) -> List[Dict]:
         """Process a single dataset using its configuration"""
         
         # Step 1: Resolve dataset path and check existence
@@ -224,12 +282,12 @@ class ValuesChecker:
         
         # Step 3: Perform spatial intersection
         #intersect_result = self._perform_spatial_intersection(dataset_name, source_dataset, buffered_layers[config['buffer']])
-        buffer_distance = self._get_buffer_distance(config)
+        # buffer_distance = self._get_buffer_distance(config)
         intersect_result = self._perform_spatial_intersection(dataset_name, source_dataset, buffer_distance)
 
         # Step 4: Extract and return results
         if intersect_result:
-            return self._extract_results_from_intersection(dataset_name, intersect_result, config, theme)
+            return self._extract_results_from_intersection(dataset_name, intersect_result, config, theme, buffer_distance)
         else:
             return []
     
@@ -247,7 +305,7 @@ class ValuesChecker:
     
     def _perform_spatial_intersection(self, dataset_name: str, source_dataset: str, buffer_layer: str) -> Optional[str]:
         """Perform spatial intersection between datasets"""
-        intersect_result = f"intersect_{dataset_name}"
+        intersect_result = f"intersect_{dataset_name}_{buffer_layer}"
         
         try:
             # Try intersect first (preserves all attributes)
@@ -267,7 +325,7 @@ class ValuesChecker:
                 self.logger.error(f"Both intersect and clip failed for {dataset_name}: {e2}")
                 return None
     
-    def _extract_results_from_intersection(self, dataset_name: str, intersect_result: str, config: DatasetConfig, theme: str) -> List[Dict]:
+    def _extract_results_from_intersection(self, dataset_name: str, intersect_result: str, config: DatasetConfig, theme: str, buffer_layer: str) -> List[Dict]:
         """Extract structured results from intersection output"""
         
         # List of intersection fields for validation
@@ -294,7 +352,7 @@ class ValuesChecker:
                     continue
                 
                 # Build base result structure
-                result = self._build_base_result(row, valid_fields, config, theme)
+                result = self._build_base_result(row, valid_fields, config, theme, buffer_layer)
                 
                 # Add theme-specific fields - additional detail for biodiversity & heritage themes
                 self._add_theme_specific_fields(result, row, valid_fields, theme)
@@ -304,14 +362,15 @@ class ValuesChecker:
 
         return results
     
-    def _build_base_result(self, row: tuple, valid_fields: List[str], config: DatasetConfig, theme: str) -> Dict:
+    def _build_base_result(self, row: tuple, valid_fields: List[str], config: DatasetConfig, theme: str, buffer_layer: str) -> Dict:
         """Build the base result structure common to all themes"""
         result = {
             'ID': row[0],
             'NAME': row[1] if len(row) > 1 else '',
             'DISTRICT': row[2] if len(row) > 2 else '',
+            'Theme': theme,
             'Value_Type': config['value_type'],
-            'theme': theme
+            'Buffer': buffer_layer
         }
         
         # Add value field
@@ -522,20 +581,20 @@ class ValuesChecker:
         # Check if current mode is in the enabled modes list
         return self.settings.mode in enabled_modes
 
-    def _get_buffer_distance(self, config:Dict) -> str:
-        """Determine buffer distance for given mode and dataset"""
+    def _get_buffer_distance(self, config:Dict) -> list:
+        """Determine buffer distance for given mode and dataset or multiple distances if supplied"""
         buffer_config = config['buffer']
         
-        # If buffer is a string, return as-is
+        # If buffer is a string, return as-is regardless of mmode
         if isinstance(buffer_config, str):
-            return 'buffer_' + buffer_config
+            return [f'buffer_{buffer_config}']
         
-        # If buffer is a dict, get mode-specific value
+        # If buffer is a dict, get mode-specific value or values
         if isinstance(buffer_config, dict):
-            return 'buffer_' + buffer_config.get(self.settings.mode, '1m')  # Default to 1m
+            return ['buffer_' + value for value in buffer_config.get(self.settings.mode, '1m')]
         
         # Fallback
-        return 'buffer_1m'
+        return ['buffer_1m']
 
     def _is_point_dataset(self, dataset_path: str) -> bool:
         """Check if a dataset has point geometry"""
@@ -600,8 +659,8 @@ VERBOSE_LOGGING = True                              # Set to True for detailed l
 # Paths to risk register data - maintained by NEP(?)
 RISK_REGISTERS = {
     'dap': WORKSPACE + r"\RiskRegister.gdb\NBFTDAP_RiskRegister",  # use this for DAP or NBFT, full risk register with all EVCs
-    'lrli': WORKSPACE + r"\RiskRegister.gdb\LRLI_RiskRegister",  # filtered out values that won't be threatened under LRLI (additional EVCs removed)
-    'jfmp': WORKSPACE + r"\RiskRegister.gdb\JFMP_RiskRegister" # for FOP/JFMP only - combined advice for both EC and AGG BRL
+    'lrli': WORKSPACE + r"\RiskRegister.gdb\LRLI_RiskRegister",    # filtered out values that won't be threatened under LRLI (additional EVCs removed)
+    'jfmp': WORKSPACE + r"\RiskRegister.gdb\JFMP_RiskRegister"     # for FOP/JFMP only - combined advice for both EC and AGG BRL
 }
 
 # Data source paths
@@ -614,14 +673,16 @@ DATA_PATHS = {
 
 # Buffer distances
 BUFFERS = {
-    '1m': "1 meter", 
-    '10m': "10 meters",
-    '50m': "50 meters", 
-    '100m': "100 meters", 
-    '250m': "250 meters", 
-    '500m': "500 meters",
-    '550m': "550 meters",
-    '1000m' : "1000 meters"
+    '1m':    {'input_features': "input_layer", 'buffer_distance': "1 meter", 'buffer_type': "FULL"},
+    '10m':   {'input_features': "input_layer", 'buffer_distance': "10 meters", 'buffer_type': "FULL"},
+    '50m':   {'input_features': "input_layer", 'buffer_distance': "50 meters", 'buffer_type': "FULL"},
+    '100m':  {'input_features': "input_layer", 'buffer_distance': "100 meters", 'buffer_type': "FULL"},
+    '250m':  {'input_features': "input_layer", 'buffer_distance': "250 meters", 'buffer_type': "FULL"},
+    '300m':  {'input_features': "input_layer", 'buffer_distance': "300 meters", 'buffer_type': "FULL"},
+    '500m':  {'input_features': "input_layer", 'buffer_distance': "500 meters", 'buffer_type': "FULL"},
+    '550m':  {'input_features': "input_layer", 'buffer_distance': "550 meters", 'buffer_type': "FULL"},
+    # '1000m': {'input_features': "input_layer", 'buffer_distance': "1000 meters", 'buffer_type': "FULL"},
+    '1000m_ring': {'input_features': "buffer_500m", 'buffer_distance': "500 meters", 'buffer_type': "OUTSIDE_ONLY"},
 }
 
 # ============================================================================
