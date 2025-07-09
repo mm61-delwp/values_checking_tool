@@ -152,24 +152,6 @@ class ValuesChecker:
         
         return working_copy
     
-    # def _create_all_buffers(self, input_data: str) -> Dict[str, str]:
-    #     """Create all required buffer distances for analysis"""
-    #     buffers = {}
-    #     buffer_names = []
-        
-    #     for buffer_name, distance in BUFFERS.items():
-    #         buffer_layer = f"buffer_{buffer_name}"
-    #         buffer_path = os.path.join(arcpy.env.workspace, buffer_layer)
-    #         if not arcpy.Exists(buffer_path):
-    #             arcpy.analysis.Buffer(input_data, buffer_layer, distance, "FULL", "ROUND", "NONE")
-    #         buffers[buffer_name] = buffer_layer
-    #         self.temp_datasets.append(buffer_layer)
-    #         self.logger.debug(f"Created {buffer_name} buffer")
-    #         buffer_names.append(buffer_name)
-        
-    #     self.logger.info(f"Buffers created at {', '.join(buffer_names)}")
-    #     return buffers
-    
     def _create_all_buffers(self, input_data: str) -> Dict[str, str]:
         """Create all required buffer distances for analysis"""
         buffers = {}
@@ -254,7 +236,7 @@ class ValuesChecker:
                     for buffer in self._get_buffer_distance(config):
                         dataset_results = self._process_single_dataset(dataset_name, config, buffer, buffered_layers, theme)
                         all_theme_results.extend(dataset_results)
-                        self.logger.info(f"Processed {dataset_name} with {buffer} buffer: {len(dataset_results)} values found")
+                        self.logger.info(f"Processed {dataset_name} with {buffer}: {len(dataset_results)} values found")
                 else:
                     self.logger.info(f"Skipped {dataset_name} as it is disabled in {mode} mode")
             except Exception as e:
@@ -273,17 +255,17 @@ class ValuesChecker:
             self.logger.warning(f"Dataset not found: {dataset_path}")
             return []
         
-        # Step 2: Apply selection criteria if specified
-        selection_criteria = config['where_clause']
-        if selection_criteria != None:
+        # Step 2: Apply selection criteria to values layer if specified
+        selection_criteria = config['where_clause'] or ""
+        
+        if selection_criteria != "":
             source_dataset = self._apply_selection_criteria(dataset_name, dataset_path, selection_criteria)
         else:
             source_dataset = dataset_path
-        
+
         # Step 3: Perform spatial intersection
-        #intersect_result = self._perform_spatial_intersection(dataset_name, source_dataset, buffered_layers[config['buffer']])
-        # buffer_distance = self._get_buffer_distance(config)
-        intersect_result = self._perform_spatial_intersection(dataset_name, source_dataset, buffer_distance)
+        ignore_lrli = config['high_risk_only'] or False
+        intersect_result = self._perform_spatial_intersection(dataset_name, source_dataset, buffer_distance, ignore_lrli)
 
         # Step 4: Extract and return results
         if intersect_result:
@@ -303,13 +285,21 @@ class ValuesChecker:
         else:
             return dataset_path
     
-    def _perform_spatial_intersection(self, dataset_name: str, source_dataset: str, buffer_layer: str) -> Optional[str]:
+    def _perform_spatial_intersection(self, dataset_name: str, source_dataset: str, buffer_layer: str, ignore_lrli: bool) -> Optional[str]:
         """Perform spatial intersection between datasets"""
         intersect_result = f"intersect_{dataset_name}_{buffer_layer}"
         
         try:
-            # Try intersect first (preserves all attributes)
-            arcpy.analysis.Intersect([buffer_layer, source_dataset], intersect_result, "ALL")
+            if ignore_lrli:
+                # filter out LRLI activities if not required
+                filter = f"{RISK_LEVEL_FIELD} <> 'LRLI'"
+                arcpy.management.SelectLayerByAttribute(buffer_layer, "NEW_SELECTION", filter)
+                arcpy.analysis.Intersect([buffer_layer, source_dataset], intersect_result, "ALL")
+                arcpy.management.SelectLayerByAttribute(buffer_layer, "CLEAR_SELECTION")
+            else:
+                arcpy.analysis.Intersect([buffer_layer, source_dataset], intersect_result, "ALL")
+
+            # add intersection to results
             self.temp_datasets.append(intersect_result)
             return intersect_result
             
@@ -332,7 +322,7 @@ class ValuesChecker:
         available_fields = [f.name for f in arcpy.ListFields(intersect_result)]
         
         # List of fields we want to keep
-        valid_fields = [ID_FIELD, NAME_FIELD, DISTRICT_FIELD]                           # add standard fields
+        valid_fields = [ID_FIELD, NAME_FIELD, DISTRICT_FIELD, RISK_LEVEL_FIELD]         # add standard fields
         valid_fields.extend([f for f in config['fields'] if f in available_fields])     # add values configuration fields that exist in intersection
         
         if len(valid_fields) < 3:  # Need at least DAP_REF_NO, DAP_NAME, DISTRICT
@@ -501,7 +491,7 @@ class ValuesChecker:
     def _create_works_detail_report(self, working_data: str) -> str:
         """Create detailed CSV report of all works"""
         works_data = []
-        fields = ["DAP_REF_NO", "DAP_NAME", "DESCRIPTION", "RISK_LVL", "DISTRICT", "AREA_HA", "Easting", "Northing"]
+        #fields = ["DAP_REF_NO", "DAP_NAME", "DESCRIPTION", "RISK_LVL", "DISTRICT", "AREA_HA", "Easting", "Northing"]
         
         with arcpy.da.SearchCursor(working_data, fields) as cursor:
             for row in cursor:
@@ -580,6 +570,17 @@ class ValuesChecker:
         
         # Check if current mode is in the enabled modes list
         return self.settings.mode in enabled_modes
+    
+    def _is_dataset_enabled_for_risk_level(self, risk_level: str, config: Dict) -> bool:
+        """Check if a dataset is enabled for the current mode"""
+        high_risk_only = config.get('high_risk_only')
+        
+        # If not found assume enabled
+        if not high_risk_only:
+            return True
+        
+        # Check if current mode is in the enabled modes list
+        return high_risk_only == risk_level
 
     def _get_buffer_distance(self, config:Dict) -> list:
         """Determine buffer distance for given mode and dataset or multiple distances if supplied"""
@@ -632,11 +633,12 @@ class ValuesChecker:
     def _cleanup_temp_data(self):
         """Clean up all temporary datasets"""
         self.logger.info("Cleaning up temporary datasets...")
+        print("Dataset deletion disabled for debugging - fix this later")
         for dataset in self.temp_datasets:
             try:
                 if arcpy.Exists(dataset):
                     # arcpy.management.Delete(dataset)          # !! NOTE: Temporarily disabled for faster debugging (don't build buffers every time)
-                    print("Dataset deletion disabled for debugging - fix this later")
+                    a = 1
             except Exception as e:
                 self.logger.warning(f"Could not delete {dataset}: {e}")
 
@@ -650,6 +652,7 @@ INPUT_DATA = r"C:\data\gippsdap\Tambo_2324_DAP.shp"
 ID_FIELD = "DAP_REF_NO"
 NAME_FIELD = "DAP_NAME"
 DISTRICT_FIELD = "DISTRICT"
+RISK_LEVEL_FIELD = "RISK_LVL"
 WORKSPACE = r"C:\data\temp"
 MODE = "JFMP"                                       # Options: "DAP", "JFMP", "NBFT", "LRLI"
 THEMES = ["forests", "biodiversity", "summary"]     # Options: "summary", "forests", "biodiversity", "water", "heritage"
@@ -681,7 +684,6 @@ BUFFERS = {
     '300m':  {'input_features': "input_layer", 'buffer_distance': "300 meters", 'buffer_type': "FULL"},
     '500m':  {'input_features': "input_layer", 'buffer_distance': "500 meters", 'buffer_type': "FULL"},
     '550m':  {'input_features': "input_layer", 'buffer_distance': "550 meters", 'buffer_type': "FULL"},
-    # '1000m': {'input_features': "input_layer", 'buffer_distance': "1000 meters", 'buffer_type': "FULL"},
     '1000m_ring': {'input_features': "buffer_500m", 'buffer_distance': "500 meters", 'buffer_type': "OUTSIDE_ONLY"},
 }
 

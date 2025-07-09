@@ -13,15 +13,15 @@ NOTE: 'modes' is OPTIONAL. If included, the layer will be processed for any mode
 DATASET:
     'name': {
             'path': string datapath to values layer
-            'high_risk_only': bool (Optional) - if True, only used for identified HRHI activities
-            'modes': list (Optional) - If list populated, layer will only be processed for listed modes
-            'buffer': string or dict - See note above
-            'where_clause': string (Optional) - SQL type selection for values
-            'fields': list - field names to include in summary
-            'value_type':  string - description of value type for all values in layer
-            'value_field': string (Optional) - field name of main value field; must exist in fields (above)     
-            'description_field': string (Optional) - field name of description field; must exist in fields (above)
-            'id_field': string (Optional) - unique identifier for value instance; must exist in fields (above)
+            'high_risk_only':       bool (Optional) - if True, only used for identified HRHI activities; default is False
+            'modes':                list (Optional) - If list populated, layer will only be processed for listed modes
+            'buffer':               string or dict (Optional) - See note above; default value is '1m'
+            'where_clause':         string (Optional) - SQL type selection for values; default is None
+            'fields':               list - field names to include in summary
+            'value_type':           string - description of value type for all values in layer
+            'value_field':          string (Optional) - field name of main value field; must exist in fields (above)     
+            'description_field':    string (Optional) - field name of description field; must exist in fields (above)
+            'id_field':             string (Optional) - unique identifier for value instance; must exist in fields (above)
         },
       """
 
@@ -31,8 +31,6 @@ DATASET_MATRIX = {
         'fmz': {
             'path': "{csdl}\\FORESTS.GDB\\FMZ100",
             'high_risk_only': True,
-            'modes': ['DAP', 'JFMP', 'NBFT'],
-            'buffer': '1m',
             'where_clause': "FMZDIS IN('SPZ', 'SMZ')",
             'fields': ["FMZDIS", "DESC1", "FMZ_NO", "DETAILNO"],
             'value_type': 'FMZ',
@@ -42,9 +40,6 @@ DATASET_MATRIX = {
         },
         'monitoring_forest': {
             'path': "{regional}\\RegionalData.gdb\\BLD_LAND_MANAGEMENT_SITES",
-            'high_risk_only': False,
-            'modes': ['DAP', 'JFMP', 'NBFT'],
-            'buffer': '1m',
             'where_clause': "(SITE_CATEGORY IN('FOREST','FIRE')) AND TIMEFRAME <> 'NOT ACTIVE'",
             'fields': ["SITE_ID", "SITE_NAME", "LMS_ID"],
             'value_type': 'Monitoring Site',
@@ -55,7 +50,6 @@ DATASET_MATRIX = {
         'recweb_sites': {
             'path': "{csdl}\\FORESTS.GDB\\RECWEB_SITE",
             'high_risk_only': True,
-            'modes': ['DAP', 'JFMP', 'NBFT'],
             'buffer': '10m',
             'where_clause': None,
             'fields': ["NAME", "FAC_TYPE", "SERIAL_NO"],
@@ -67,7 +61,6 @@ DATASET_MATRIX = {
         'recweb_assets': {
             'path': "{csdl}\\FORESTS.GDB\\RECWEB_ASSET",
             'high_risk_only': True,
-            'modes': ['DAP', 'JFMP', 'NBFT'],
             'buffer': '10m',
             'where_clause': None,
             'fields': ["NAME", "ASSET_CLS", "SERIAL_NO"],
@@ -79,7 +72,6 @@ DATASET_MATRIX = {
         'recweb_historic_assets': {
             'path': "{csdl}\\FORESTS.GDB\\RECWEB_HISTORIC_RELIC",
             'high_risk_only': True,
-            'modes': ['DAP', 'JFMP', 'NBFT'],
             'buffer': '10m',
             'where_clause': None,
             'fields': ["NAME", "ASSET_CLS", "SERIAL_NO"],
@@ -91,7 +83,6 @@ DATASET_MATRIX = {
         'recweb_sign': {
             'path': "{csdl}\\FORESTS.GDB\\RECWEB_SIGN",
             'high_risk_only': True,
-            'modes': ['DAP', 'JFMP', 'NBFT'],
             'buffer': '10m',
             'where_clause': None,
             'fields': ["NAME", "ASSET_CLS", "SERIAL_NO"],
@@ -103,7 +94,6 @@ DATASET_MATRIX = {
         'recweb_carpark': {
             'path': "{csdl}\\FORESTS.GDB\\RECWEB_CARPARK",
             'high_risk_only': True,
-            'modes': ['DAP', 'JFMP', 'NBFT'],
             'buffer': '10m',
             'where_clause': None,
             'fields': ["NAME", "ASSET_CLS", "SERIAL_NO"],
@@ -114,8 +104,6 @@ DATASET_MATRIX = {
         },
         'historic_sites': {
             'path': "{csdl}\\FLORAFAUNA1.GDB\\HIST100_POINT",
-            'high_risk_only': False,
-            'modes': ['DAP', 'JFMP', 'NBFT'],
             'buffer': '300m',
             'where_clause': None,
             'fields': ["NAME"],
@@ -126,9 +114,6 @@ DATASET_MATRIX = {
         },
         'trp_coupes': {
             'path': "{csdl}\\FORESTRY.GDB\\TRP",
-            'high_risk_only': False,
-            'modes': ['DAP', 'JFMP', 'NBFT'],
-            'buffer': '1m',
             'where_clause': None,
             'fields': ["COUPE"],
             'value_type': 'TRP Coupe',
@@ -138,20 +123,16 @@ DATASET_MATRIX = {
         },
         'burn_plan': {
             'path': "{csdl}\\FIRE.GDB\\BURNPLAN25",
-            'high_risk_only': False,
-            'modes': ['DAP', 'JFMP', 'NBFT'],
-            'buffer': '1m',
             'where_clause': "REGION = 'Gippsland'",
-            'fields': ["TREAT_NO", "TREAT_NAME"],
+            'fields': ["TREAT_NO", "TREAT_NAME", "TREAT_TYPE"],
             'value_type': 'Joint Fuel Management Plan',
-            'value_field': 'TREAT_NO',
+            'value_field': 'TREAT_TYPE',
             'description_field': 'TREAT_NAME',
-            'id_field': None
+            'id_field': 'TREAT_NO'
         },
         'giant_trees': {
             'path': "{csdl}\\FORESTS.GDB\\EG_GIANT_TREES",
             'high_risk_only': True,
-            'modes': ['DAP', 'JFMP', 'NBFT'],
             'buffer': '10m',
             'where_clause': None,
             'fields': ["SOURCE"],
@@ -163,7 +144,6 @@ DATASET_MATRIX = {
         'alpine_huts': {
             'path': "{csdl}\\FORESTS.GDB\\EG_ALPINE_HUT_SURVEY",
             'high_risk_only': True,
-            'modes': ['DAP', 'JFMP', 'NBFT'],
             'buffer': '10m',
             'where_clause': None,
             'fields': ["NAME", "EASTING", "NORTHING"],
@@ -174,8 +154,6 @@ DATASET_MATRIX = {
         },
         'mine_site': {
             'path': "{csdl}\\MINERALS.GDB\\MINSITE",
-            'high_risk_only': False,
-            'modes': ['DAP', 'JFMP', 'NBFT'],
             'buffer': '100m',
             'where_clause': None,
             'fields': ["SITEID", "MINE_TYPE", "MINE_NAME"],
@@ -186,9 +164,6 @@ DATASET_MATRIX = {
         },
         'mine_lease': {
             'path': "{csdl}\\MINERALS.GDB\\MIN",
-            'high_risk_only': False,
-            'modes': ['DAP', 'JFMP', 'NBFT'],
-            'buffer': '1m',
             'where_clause': None,
             'fields': ["TAG", "STATUSADSC", "TNO"],
             'value_type': 'Mining Lease',
@@ -198,9 +173,6 @@ DATASET_MATRIX = {
         },
         'apiary_site': {
             'path': "{csdl}\\CROWNLAND.GDB\\APIARY_BUFF",
-            'high_risk_only': False,
-            'modes': ['DAP', 'JFMP', 'NBFT'],
-            'buffer': '1m',
             'where_clause': None,
             'fields': ["TENURE_ID"],
             'value_type': 'Apiary Site',
@@ -210,9 +182,6 @@ DATASET_MATRIX = {
         },
         'chemical_control': {
             'path': "{csdl}\\regional_business.gdb\\BLD_CHEMICAL_CONTROL_AREAS",
-            'high_risk_only': False,
-            'modes': ['DAP', 'JFMP', 'NBFT'],
-            'buffer': '1m',
             'where_clause': None,
             'fields': ["ACCA_NAME"],
             'value_type': 'Agricultural Chemical Control Area',
@@ -222,9 +191,6 @@ DATASET_MATRIX = {
         },
         'phytophthora_risk': {
             'path': "{csdl}\\regional_business.gdb\\HIGH_PC_RISK_0610_POLY",
-            'high_risk_only': False,
-            'modes': ['DAP', 'JFMP', 'NBFT'],
-            'buffer': '1m',
             'where_clause': "CLASS = 'High'",
             'fields': ["CLASS"],
             'value_type': 'Phytophthora Risk',
@@ -234,8 +200,6 @@ DATASET_MATRIX = {
         },
         'heritage_inventory': {
             'path': "{csdl}\\PLANNING.GDB\\HERITAGE_INVENTORY",
-            'high_risk_only': False,
-            'modes': ['DAP', 'JFMP', 'NBFT'],
             'buffer': '50m',
             'where_clause': None,
             'fields': ["VHI_NUM", "SITE_NAME", "HERMES_NUM"],
@@ -246,8 +210,6 @@ DATASET_MATRIX = {
         },
         'heritage_register': {
             'path': "{csdl}\\PLANNING.GDB\\HERITAGE_REGISTER",
-            'high_risk_only': False,
-            'modes': ['DAP', 'JFMP', 'NBFT'],
             'buffer': '50m',
             'where_clause': None,
             'fields': ["VHR_NUM", "SITE_NAME", "HERMES_NUM"],
@@ -259,8 +221,6 @@ DATASET_MATRIX = {
         'grazing_license': {
             'path': "{csdl}\\VMCLTENURE.GDB\\V_CL_TENURE_POLY",
             'high_risk_only': True,
-            'modes': ['DAP', 'JFMP', 'NBFT'],
-            'buffer': '1m',
             'where_clause': "CLTEN_TENURE_CODE >= '100' and CLTEN_TENURE_CODE < '200'",
             'fields': ["CLTEN_TENURE_ID", "TENURE", "HERMES_NUM"],
             'value_type': 'Grazing Licence',
@@ -270,8 +230,6 @@ DATASET_MATRIX = {
         },
         'powerline': {
             'path': "{csdl}\\VMFEAT.gdb\\POWER_LINE",
-            'high_risk_only': False,
-            'modes': ['DAP', 'JFMP', 'NBFT'],
             'buffer': '50m',
             'where_clause': None,
             'fields': ["FEATURE_SUBTYPE", "VOLTAGE"],
@@ -282,8 +240,6 @@ DATASET_MATRIX = {
         },
         'pipeline': {
             'path': "{csdl}\\VMFEAT.gdb\\FOI_LINE",
-            'high_risk_only': False,
-            'modes': ['DAP', 'JFMP', 'NBFT'],
             'buffer': '50m',
             'where_clause': "FEATURE_TYPE = 'pipeline'",
             'fields': ["FEATURE_SUBTYPE", "NAME_LABEL"],
@@ -294,8 +250,6 @@ DATASET_MATRIX = {
         },
         'railway': {
             'path': "{csdl}\\VMTRANS.gdb\\TR_RAIL",
-            'high_risk_only': False,
-            'modes': ['DAP', 'JFMP', 'NBFT'],
             'buffer': '50m',
             'where_clause': None, # CHECK - original script has query commented out?
             'fields': ["NAME", "FEATURE_TYPE_CODE"],
@@ -312,7 +266,6 @@ DATASET_MATRIX = {
         'vba_flora25': {
             'path': "{csdl}\\FLORAFAUNA1.GDB\\VBA_FLORA25",
             'buffer': {'DAP': '50m', 'JFMP': {'500m', '1000m_ring'}, 'NBFT': '50m'},
-            'modes': ['DAP', 'JFMP', 'NBFT'],
             'where_clause': "(STARTDATE > date '1980-01-01 00:00:00') AND (MAX_ACC_KM <= 0.5) AND (EPBC_DESC in ('Endangered','Vulnerable','Critically Endangered') OR OLD_VICADV in ('e','v','P','x') OR FFG in('cr','en','vu','th','cd','en-x','L'))",
             'fields': ["SCI_NAME", "COMM_NAME", "TAXON_ID", "EXTRA_INFO", "RECORD_ID"],
             'value_type': 'Flora',
@@ -323,7 +276,6 @@ DATASET_MATRIX = {
         'vba_flora_threatened': {
             'path': "{csdl_restricted}\\VBA_FLORA_THREATENED",
             'buffer': {'DAP': '50m', 'JFMP': {'500m', '1000m_ring'}, 'NBFT': '50m'},
-            'modes': ['DAP', 'JFMP', 'NBFT'],
             'where_clause': "(STARTDATE > date '1980-01-01 00:00:00') AND (MAX_ACC_KM <= 0.5)",
             'fields': ["SCI_NAME", "COMM_NAME", "TAXON_ID", "EXTRA_INFO", "RECORD_ID"],
             'value_type': 'Flora_Threatened',
@@ -334,7 +286,6 @@ DATASET_MATRIX = {
         'vba_flora_restricted': {
             'path': "{csdl_restricted}\\VBA_FLORA_RESTRICTED",
             'buffer': {'DAP': '50m', 'JFMP': {'500m', '1000m_ring'}, 'NBFT': '50m'},
-            'modes': ['DAP', 'JFMP', 'NBFT'],
             'where_clause': "(STARTDATE > date '1980-01-01 00:00:00') AND (MAX_ACC_KM <= 0.5)",
             'fields': ["SCI_NAME", "COMM_NAME", "TAXON_ID", "EXTRA_INFO", "RECORD_ID"],
             'value_type': 'Flora_Restricted',
@@ -346,7 +297,6 @@ DATASET_MATRIX = {
         'vba_fauna_owl': {
             'path': "{csdl}\\FLORAFAUNA1.GDB\\VBA_FAUNA25",
             'buffer': {'DAP': '250m', 'JFMP': {'500m', '1000m_ring'}, 'NBFT': '250m'},
-            'modes': ['DAP', 'JFMP', 'NBFT'],
             'where_clause': "(STARTDATE > date '1980-01-01 00:00:00') AND (MAX_ACC_KM <= 0.5) AND " +
                 "(COMM_NAME in ('Masked Owl','Powerful Owl','Sooty Owl','Square-tailed Kite','Barking Owl')) AND " +
                 "(EXTRA_INFO in ('Roost site','Breeding'))",
@@ -359,7 +309,6 @@ DATASET_MATRIX = {
         'vba_fauna_wbse': {
             'path': "{csdl}\\FLORAFAUNA1.GDB\\VBA_FAUNA25",
             'buffer': {'DAP': '500m', 'JFMP': {'500m', '1000m_ring'}, 'NBFT': '500m'},
-            'modes': ['DAP', 'JFMP', 'NBFT'],
             'where_clause': "(STARTDATE > date '1980-01-01 00:00:00') AND (MAX_ACC_KM <= 0.5) AND " +
                 "(COMM_NAME = 'White-bellied Sea-Eagle') and (EXTRA_INFO in ('Roost site','Breeding'))",
             'fields': ["SCI_NAME", "COMM_NAME", "TAXON_ID", "EXTRA_INFO", "RECORD_ID"],
@@ -371,7 +320,6 @@ DATASET_MATRIX = {
         'vba_fauna_ghawk': {
             'path': "{csdl}\\FLORAFAUNA1.GDB\\VBA_FAUNA25",
             'buffer': {'DAP': '250m', 'JFMP': {'500m', '1000m_ring'}, 'NBFT': '250m'},
-            'modes': ['DAP', 'JFMP', 'NBFT'],
             'where_clause': "(STARTDATE > date '1980-01-01 00:00:00') AND (MAX_ACC_KM <= 0.5) AND " +
                 "(COMM_NAME = 'Grey Goshawk') and (EXTRA_INFO in ('Roost site','Breeding'))",
             'fields': ["SCI_NAME", "COMM_NAME", "TAXON_ID", "EXTRA_INFO", "RECORD_ID"],
@@ -383,7 +331,6 @@ DATASET_MATRIX = {
         'vba_fauna_bat': {
             'path': "{csdl}\\FLORAFAUNA1.GDB\\VBA_FAUNA25",
             'buffer': {'DAP': '100m', 'JFMP': {'500m', '1000m_ring'}, 'NBFT': '100m'},
-            'modes': ['DAP', 'JFMP', 'NBFT'],
             'where_clause': "(STARTDATE > date '1980-01-01 00:00:00') AND (MAX_ACC_KM <= 0.5) AND " +
                 "(COMM_NAME in ('Grey-headed Flying-fox','Eastern Horseshoe Bat','Common Bent-wing Bat','Eastern Bent-winged Bat')) and " + 
                 "(EXTRA_INFO in ('Roost site','Breeding'))",
@@ -396,7 +343,6 @@ DATASET_MATRIX = {
         'vba_fauna25': {
             'path': "{csdl}\\FLORAFAUNA1.GDB\\VBA_FAUNA25",
             'buffer': {'DAP': '50m', 'JFMP': {'500m', '1000m_ring'}, 'NBFT': '50m'},
-            'modes': ['DAP', 'JFMP', 'NBFT'],
             'where_clause': "(STARTDATE > date '1980-01-01 00:00:00') AND (MAX_ACC_KM <= 0.5) AND (EPBC_DESC in ('Endangered','Vulnerable','Critically Endangered') OR OLD_VICADV in ('cr','en','vu','wx') OR FFG in ('cr','en','vu','th','cd','en-x','L') OR COMM_NAME = 'Koala')",
             'fields': ["SCI_NAME", "COMM_NAME", "TAXON_ID", "EXTRA_INFO", "RECORD_ID"],
             'value_type': 'Fauna',
@@ -408,7 +354,6 @@ DATASET_MATRIX = {
         'vba_fauna_threatened_owl': {
             'path': "{csdl_restricted}\\VBA_FAUNA_THREATENED",
             'buffer': {'DAP': '250m', 'JFMP': {'500m', '1000m_ring'}, 'NBFT': '250m'},
-            'modes': ['DAP', 'JFMP', 'NBFT'],
             'where_clause': "(STARTDATE > date '1980-01-01 00:00:00') AND (MAX_ACC_KM <= 0.5) AND " +
                 "(COMM_NAME in ('Masked Owl','Powerful Owl','Sooty Owl','Square-tailed Kite','Barking Owl')) AND " +
                 "(EXTRA_INFO in ('Roost site','Breeding'))",
@@ -421,7 +366,6 @@ DATASET_MATRIX = {
         'vba_fauna_threatened_wbse': {
             'path': "{csdl_restricted}\\VBA_FAUNA_THREATENED",
             'buffer': {'DAP': '500m', 'JFMP': {'500m', '1000m_ring'}, 'NBFT': '500m'},
-            'modes': ['DAP', 'JFMP', 'NBFT'],
             'where_clause': "(STARTDATE > date '1980-01-01 00:00:00') AND (MAX_ACC_KM <= 0.5) AND " +
                 "(COMM_NAME = 'White-bellied Sea-Eagle') and (EXTRA_INFO in ('Roost site','Breeding'))",
             'fields': ["SCI_NAME", "COMM_NAME", "TAXON_ID", "EXTRA_INFO", "RECORD_ID"],
@@ -433,7 +377,6 @@ DATASET_MATRIX = {
         'vba_fauna_threatened_ghawk': {
             'path': "{csdl_restricted}\\VBA_FAUNA_THREATENED",
             'buffer': {'DAP': '250m', 'JFMP': {'500m', '1000m_ring'}, 'NBFT': '250m'},
-            'modes': ['DAP', 'JFMP', 'NBFT'],
             'where_clause': "(STARTDATE > date '1980-01-01 00:00:00') AND (MAX_ACC_KM <= 0.5) AND " +
                 "(COMM_NAME = 'Grey Goshawk') and (EXTRA_INFO in ('Roost site','Breeding'))",
             'fields': ["SCI_NAME", "COMM_NAME", "TAXON_ID", "EXTRA_INFO", "RECORD_ID"],
@@ -445,7 +388,6 @@ DATASET_MATRIX = {
         'vba_fauna_threatened_bat': {
             'path': "{csdl_restricted}\\VBA_FAUNA_THREATENED",
             'buffer': {'DAP': '100m', 'JFMP': {'500m', '1000m_ring'}, 'NBFT': '100m'},
-            'modes': ['DAP', 'JFMP', 'NBFT'],
             'where_clause': "(STARTDATE > date '1980-01-01 00:00:00') AND (MAX_ACC_KM <= 0.5) AND " +
                 "(COMM_NAME in ('Grey-headed Flying-fox','Eastern Horseshoe Bat','Common Bent-wing Bat','Eastern Bent-winged Bat')) and " + 
                 "(EXTRA_INFO in ('Roost site','Breeding'))",
@@ -458,7 +400,6 @@ DATASET_MATRIX = {
         'vba_fauna_threatened': {
             'path': "{csdl_restricted}\\VBA_FAUNA_THREATENED",
             'buffer': {'DAP': '50m', 'JFMP': {'500m', '1000m_ring'}, 'NBFT': '50m'},
-            'modes': ['DAP', 'JFMP', 'NBFT'],
             'where_clause': "(STARTDATE > date '1980-01-01 00:00:00') AND (MAX_ACC_KM <= 0.5)",
             'fields': ["SCI_NAME", "COMM_NAME", "TAXON_ID", "EXTRA_INFO", "RECORD_ID"],
             'value_type': 'Fauna_Threatened',
@@ -470,7 +411,6 @@ DATASET_MATRIX = {
         'vba_fauna_restricted_owl': {
             'path': "{csdl_restricted}\\VBA_FAUNA_RESTRICTED",
             'buffer': {'DAP': '250m', 'JFMP': {'500m', '1000m_ring'}, 'NBFT': '250m'},
-            'modes': ['DAP', 'JFMP', 'NBFT'],
             'where_clause': "(STARTDATE > date '1980-01-01 00:00:00') AND (MAX_ACC_KM <= 0.5) AND " +
                 "(COMM_NAME in ('Masked Owl','Powerful Owl','Sooty Owl','Square-tailed Kite','Barking Owl')) AND " +
                 "(EXTRA_INFO in ('Roost site','Breeding'))",
@@ -483,7 +423,6 @@ DATASET_MATRIX = {
         'vba_fauna_restricted_wbse': {
             'path': "{csdl_restricted}\\VBA_FAUNA_RESTRICTED",
             'buffer': {'DAP': '500m', 'JFMP': {'500m', '1000m_ring'}, 'NBFT': '500m'},
-            'modes': ['DAP', 'JFMP', 'NBFT'],
             'where_clause': "(STARTDATE > date '1980-01-01 00:00:00') AND (MAX_ACC_KM <= 0.5) AND " +
                 "(COMM_NAME = 'White-bellied Sea-Eagle') and (EXTRA_INFO in ('Roost site','Breeding'))",
             'fields': ["SCI_NAME", "COMM_NAME", "TAXON_ID", "EXTRA_INFO", "RECORD_ID"],
@@ -495,7 +434,6 @@ DATASET_MATRIX = {
         'vba_fauna_restricted_ghawk': {
             'path': "{csdl_restricted}\\VBA_FAUNA_RESTRICTED",
             'buffer': {'DAP': '250m', 'JFMP': {'500m', '1000m_ring'}, 'NBFT': '250m'},
-            'modes': ['DAP', 'JFMP', 'NBFT'],
             'where_clause': "(STARTDATE > date '1980-01-01 00:00:00') AND (MAX_ACC_KM <= 0.5) AND " +
                 "(COMM_NAME = 'Grey Goshawk') and (EXTRA_INFO in ('Roost site','Breeding'))",
             'fields': ["SCI_NAME", "COMM_NAME", "TAXON_ID", "EXTRA_INFO", "RECORD_ID"],
@@ -507,7 +445,6 @@ DATASET_MATRIX = {
         'vba_fauna_restricted_bat': {
             'path': "{csdl_restricted}\\VBA_FAUNA_RESTRICTED",
             'buffer': {'DAP': '100m', 'JFMP': {'500m', '1000m_ring'}, 'NBFT': '100m'},
-            'modes': ['DAP', 'JFMP', 'NBFT'],
             'where_clause': "(STARTDATE > date '1980-01-01 00:00:00') AND (MAX_ACC_KM <= 0.5) AND " +
                 "(COMM_NAME in ('Grey-headed Flying-fox','Eastern Horseshoe Bat','Common Bent-wing Bat','Eastern Bent-winged Bat')) and " + 
                 "(EXTRA_INFO in ('Roost site','Breeding'))",
@@ -520,7 +457,6 @@ DATASET_MATRIX = {
         'vba_fauna_restricted': {
             'path': "{csdl_restricted}\\VBA_FAUNA_RESTRICTED",
             'buffer': {'DAP': '50m', 'JFMP': {'500m', '1000m_ring'}, 'NBFT': '50m'},
-            'modes': ['DAP', 'JFMP', 'NBFT'],
             'where_clause': "(STARTDATE > date '1980-01-01 00:00:00') AND (MAX_ACC_KM <= 0.5) AND " +
                 "(COMM_NAME not in ('Masked Owl','Powerful Owl','Sooty Owl','Square-tailed Kite','Barking Owl'," + 
                 "'Grey-headed Flying-fox','Eastern Horseshoe Bat','Common Bent-wing Bat','Eastern Bent-winged Bat'," +
@@ -535,7 +471,6 @@ DATASET_MATRIX = {
         'evc': {
             'path': "{csdl}\\FLORAFAUNA1.GDB\\NV2005_EVCBCS",
             'buffer': {'DAP': '50m', 'JFMP': {'500m', '1000m_ring'}, 'NBFT': '50m'},
-            'modes': ['DAP', 'JFMP', 'NBFT'],
             'where_clause': None,
             'fields': ["X_EVCNAME", "VEG_CODE"],
             'value_type': 'EVC',
@@ -546,7 +481,6 @@ DATASET_MATRIX = {
         'lbp_colonies': {
             'path': "{csdl}\\FLORAFAUNA1.GDB\\LBPAG_BUFF_CHRFA",
             'buffer': {'DAP': '50m', 'JFMP': {'500m', '1000m_ring'}, 'NBFT': '50m'},
-            'modes': ['DAP', 'JFMP', 'NBFT'],
             'high_risk_only': True,
             'where_clause': None,
             'fields': ["LBP_DESC"],
@@ -558,7 +492,6 @@ DATASET_MATRIX = {
         'monitoring_bio': {
             'path': "{regional}\\RegionalData.gdb\\BLD_LAND_MANAGEMENT_SITES",
             'buffer': {'DAP': '50m', 'JFMP': {'500m', '1000m_ring'}, 'NBFT': '50m'},
-            'modes': ['DAP', 'JFMP', 'NBFT'],
             'where_clause': "(SITE_CATEGORY IN('FAUNA', 'FLORA') OR RISK_CODE = 'LittoralRF') AND TIMEFRAME <> 'NOT ACTIVE'",
             'fields': ["SITE_NAME", "RISK_CODE", "LMS_ID"],
             'value_type': 'Bio Monitoring',
@@ -566,10 +499,75 @@ DATASET_MATRIX = {
             'description_field': 'RISK_CODE',
             'id_field': 'LMS_ID'
         },
+        'species_recovery_overlay_gbc': {
+            'path': "{regional}\\RegionalData.gdb\\BLD_SpeciesRecoveryOverlay_20210611",
+            'buffer': '100m',
+            'modes': ['JFMP', 'NBFT'],
+            'where_clause': "SRO_GBC = 'Yes'",
+            'fields': ["PU_ID", "SRO_GBC"],
+            'value_type': 'SRO - GBC',
+            'value_field': 'SRO_GBC',
+            'description_field': None,
+            'id_field': 'PU_ID'
+        },
+        'species_recovery_overlay_dpy': {
+            'path': "{regional}\\RegionalData.gdb\\BLD_SpeciesRecoveryOverlay_20210611",
+            'buffer': '100m',
+            'modes': ['JFMP', 'NBFT'],
+            'where_clause': "SRO_DPy = 'Yes'",
+            'fields': ["PU_ID", "SRO_DPy"],
+            'value_type': 'SRO - DPy',
+            'value_field': 'SRO_DPy',
+            'description_field': None,
+            'id_field': 'PU_ID'
+        },
+        'species_recovery_overlay_sgg': {
+            'path': "{regional}\\RegionalData.gdb\\BLD_SpeciesRecoveryOverlay_20210611",
+            'buffer': '100m',
+            'modes': ['JFMP', 'NBFT'],
+            'where_clause': "SRO_SGG = 'Yes'",
+            'fields': ["PU_ID", "SRO_SGG"],
+            'value_type': 'SRO - SGG',
+            'value_field': 'SRO_SGG',
+            'description_field': None,
+            'id_field': 'PU_ID'
+        },
+        'species_recovery_overlay_mo': {
+            'path': "{regional}\\RegionalData.gdb\\BLD_SpeciesRecoveryOverlay_20210611",
+            'buffer': '100m',
+            'modes': ['JFMP', 'NBFT'],
+            'where_clause': "SRO_MO = 'Yes'",
+            'fields': ["PU_ID", "SRO_MO"],
+            'value_type': 'SRO - MO',
+            'value_field': 'SRO_MO',
+            'description_field': None,
+            'id_field': 'PU_ID'
+        },
+        'species_recovery_overlay_so': {
+            'path': "{regional}\\RegionalData.gdb\\BLD_SpeciesRecoveryOverlay_20210611",
+            'buffer': '100m',
+            'modes': ['JFMP', 'NBFT'],
+            'where_clause': "SRO_SO = 'Yes'",
+            'fields': ["PU_ID", "SRO_SO"],
+            'value_type': 'SRO - SO',
+            'value_field': 'SRO_SO',
+            'description_field': None,
+            'id_field': 'PU_ID'
+        },
+        'species_recovery_overlay_stq': {
+            'path': "{regional}\\RegionalData.gdb\\BLD_SpeciesRecoveryOverlay_20210611",
+            'buffer': '100m',
+            'modes': ['JFMP', 'NBFT'],
+            'where_clause': "SRO_STQ = 'Yes'",
+            'fields': ["PU_ID", "SRO_STQ"],
+            'value_type': 'SRO - STQ',
+            'value_field': 'SRO_STQ',
+            'description_field': None,
+            'id_field': 'PU_ID'
+        },
         'rainforest': {
             'path': "{csdl}\\FORESTS.GDB\\RAINFOR",
             'buffer': {'DAP': '50m', 'JFMP': {'500m', '1000m_ring'}, 'NBFT': '50m'},
-            'modes': ['DAP', 'JFMP', 'NBFT'],
             'where_clause': "CHECKED = 1", # Edited from "RF = 1" because field RF doesn't exist
             'fields': ["EVC_RF"],
             'value_type': 'Rainforest',
@@ -577,10 +575,19 @@ DATASET_MATRIX = {
             'description_field': None,
             'id_field': None
         },
+        'rainforest_clip': {
+            'path': "{csdl}\\FORESTS.GDB\\RAINFOREST_CLIP",
+            'buffer': {'DAP': '50m', 'JFMP': {'500m', '1000m_ring'}, 'NBFT': '50m'},
+            'where_clause': "RF = 1", 
+            'fields': ["EVC_RF"],
+            'value_type': 'Rainforest - Clip',
+            'value_field': 'EVC_RF',
+            'description_field': None,
+            'id_field': None
+        },
         'rainforest_100': {
             'path': "{csdl}\\FORESTS.GDB\\RAINFOR100_CH",
             'buffer': {'DAP': '50m', 'JFMP': {'500m', '1000m_ring'}, 'NBFT': '50m'},
-            'modes': ['DAP', 'JFMP', 'NBFT'],
             'where_clause': "RF = 1", 
             'fields': ["SRC"],
             'value_type': 'Rainforest_100',
@@ -591,7 +598,6 @@ DATASET_MATRIX = {
         'aquatic': {
             'path': "{csdl}\\FLORAFAUNA1.GDB\\ARI_AQUA_CATCH",
             'buffer': {'DAP': '1m', 'JFMP': {'500m', '1000m_ring'}, 'NBFT': '1m'},
-            'modes': ['DAP', 'JFMP', 'NBFT'],
             'where_clause': None,
             'fields': ["SCI_NAME", "COMM_NAME", "TAXON_ID"],
             'value_type': 'Aquatic',
@@ -606,7 +612,6 @@ DATASET_MATRIX = {
         'achris_sites_prelim': {
             'path': "{csdl_culture}\\prelim_ch_change_detection\\data",
             'buffer': {'DAP': '550m', 'JFMP': {'500m', '1000m_ring'}, 'NBFT': '550m'},
-            'modes': ['DAP', 'JFMP', 'NBFT'],
             'where_clause': None,
             'fields': ["COMPONENT_NO", "PLACE_NAME", "COMPONENT_TYPE", "DATE_MODIFIED"],
             'value_type': 'Heritage Site - Preliminary',
@@ -617,7 +622,6 @@ DATASET_MATRIX = {
         'achris_sites': {
             'path': "{csdl_culture}\\ACHP_FIRESENS",
             'buffer': {'DAP': '550m', 'JFMP': {'500m', '1000m_ring'}, 'NBFT': '550m'},
-            'modes': ['DAP', 'JFMP', 'NBFT'],
             'where_clause': None,
             'fields': ["COMPONENT_NO", "PLACE_NAME", "COMPONENT_TYPE", "DATE_MODIFIED", "FIRE_SENSITIVITY"],
             'value_type': 'Heritage Site',
@@ -627,8 +631,6 @@ DATASET_MATRIX = {
         },
         'rap_areas': {
             'path': "{csdl}\\CULTURE.gdb\\RAP",
-            'buffer': '1m',
-            'modes': ['DAP', 'JFMP', 'NBFT'],
             'where_clause': None,
             'fields': ["NAME"],
             'value_type': 'RAP Area',
@@ -638,7 +640,6 @@ DATASET_MATRIX = {
         },
         'cultural_sensitivity': {
             'path': "{csdl}\\CULTURE.gdb\\SENSITIVITY_PUBLIC",
-            'buffer': '1m',
             'where_clause': None,
             'fields': ["SENSITIVITY"],
             'value_type': 'Cultural Sensitivity',
@@ -648,7 +649,6 @@ DATASET_MATRIX = {
         },
         'joint_managed_parks': {
             'path': "{regional}\\RegionalData.gdb\\GLaWACJointManagedParks_Dissolved",
-            'buffer': '1m',
             'where_clause': None,
             'fields': ["JointManagedPark"],
             'value_type': 'Joint Managed Park',
@@ -658,7 +658,6 @@ DATASET_MATRIX = {
         },
         'plm25': {
             'path': "{csdl}\\CROWNLAND.GDB\\PLM25",
-            'buffer': '1m',
             'where_clause': None,
             'fields': ["MMTGEN", "MNG_SPEC", "ACT"],
             'value_type': 'Land Tenure',
@@ -672,7 +671,6 @@ DATASET_MATRIX = {
     'summary': {
         'plm25': {
             'path': "{csdl}\\CROWNLAND.GDB\\PLM25",
-            'buffer': '1m',
             'where_clause': None,
             'fields': ["MMTGEN", "MNG_SPEC", "ACT"],
             'value_type': 'Land Tenure',
@@ -682,7 +680,6 @@ DATASET_MATRIX = {
         },
         'planning_zones': {
             'path': "{csdl}\\VMPLAN.GDB\\PLAN_ZONE",
-            'buffer': '1m',
             'where_clause': None,
             'fields': ["ZONE_CODE", "LGA"],
             'value_type': 'Planning Zone',
@@ -692,7 +689,6 @@ DATASET_MATRIX = {
         },
         'forest_type': {
             'path': "{csdl}\\FORESTS.GDB\\FORTYPE500",
-            'buffer': '1m',
             'where_clause': None,
             'fields': ["X_DESC"],
             'value_type': 'Forest Type',
@@ -702,7 +698,6 @@ DATASET_MATRIX = {
         },
         'native_title': {
             'path': "{regional}\\RegionalData.gdb\\GUNAIKURNAI_DETERMINATION",
-            'buffer': '1m',
             'where_clause': None,
             'fields': ["NT_Name", "Tribunal_No", "NT_STATUS"],
             'value_type': 'Native Title',
@@ -716,7 +711,6 @@ DATASET_MATRIX = {
     'water': {
         'watercourse': {
             'path': "{csdl}\\VMHYDRO.gdb\\HY_WATERCOURSE",
-            'buffer': '1m',
             'where_clause': None,
             'value_type': 'Watercourse',
             'value_field': 'NAME',
@@ -725,7 +719,6 @@ DATASET_MATRIX = {
         },
         'cma_boundaries': {
             'path': "{csdl}\\CATCHMENTS.gdb\\CMA100",
-            'buffer': '1m',
             'where_clause': None,
             'fields': ["CMANAME"],
             'value_type': 'CMA Boundary',
