@@ -204,12 +204,7 @@ class ValuesChecker:
     
     def _process_single_theme(self, theme: str, buffered_layers: Dict[str, str]) -> List[Dict]:
         """Process all datasets for a single theme"""
-        
-        # Skip certain themes for LRLI mode
-        if self.settings.mode == 'LRLI' and theme in ['biodiversity', 'heritage', 'summary']:
-            self.logger.info(f"Skipping {theme} theme for LRLI mode")
-            return []
-        
+              
         # Get dataset configurations for this theme
         if theme not in DATASET_MATRIX:
             self.logger.warning(f"No datasets configured for theme: {theme}")
@@ -219,16 +214,6 @@ class ValuesChecker:
         
         # Process each dataset in the theme
         all_theme_results = []
-        # for dataset_name, config in theme_datasets.items():
-        #     try:
-        #         if self._is_dataset_enabled_for_mode(config):
-        #             dataset_results = self._process_single_dataset(dataset_name, config, buffered_layers, theme)
-        #             all_theme_results.extend(dataset_results)
-        #             self.logger.info(f"Processed {dataset_name}: {len(dataset_results)} values found")
-        #         else:
-        #             self.logger.info(f"Skipped {dataset_name} as it is disabled in {mode} mode")
-        #     except Exception as e:
-        #         self.logger.warning(f"Failed to process {dataset_name}: {e}")
         
         for dataset_name, config in theme_datasets.items():
             try:
@@ -256,15 +241,19 @@ class ValuesChecker:
             return []
         
         # Step 2: Apply selection criteria to values layer if specified
-        selection_criteria = config['where_clause'] or ""
+        selection_criteria = config['where_clause'] or None
         
-        if selection_criteria != "":
+        if selection_criteria:
             source_dataset = self._apply_selection_criteria(dataset_name, dataset_path, selection_criteria)
         else:
             source_dataset = dataset_path
 
         # Step 3: Perform spatial intersection
-        ignore_lrli = config['high_risk_only'] or False
+        if 'high_risk_only' in config:
+            ignore_lrli = config['high_risk_only'] # If specified in dataset matrix, process features as specified (True or False)
+        else:
+            ignore_lrli = False # If not specified in dataset matrix, default includes all features
+
         intersect_result = self._perform_spatial_intersection(dataset_name, source_dataset, buffer_distance, ignore_lrli)
 
         # Step 4: Extract and return results
@@ -358,6 +347,7 @@ class ValuesChecker:
             'ID': row[0],
             'NAME': row[1] if len(row) > 1 else '',
             'DISTRICT': row[2] if len(row) > 2 else '',
+            'RISK_LVL': row[3] if len(row) > 3 else '',
             'Theme': theme,
             'Value_Type': config['value_type'],
             'Buffer': buffer_layer
@@ -570,23 +560,15 @@ class ValuesChecker:
         
         # Check if current mode is in the enabled modes list
         return self.settings.mode in enabled_modes
-    
-    def _is_dataset_enabled_for_risk_level(self, risk_level: str, config: Dict) -> bool:
-        """Check if a dataset is enabled for the current mode"""
-        high_risk_only = config.get('high_risk_only')
-        
-        # If not found assume enabled
-        if not high_risk_only:
-            return True
-        
-        # Check if current mode is in the enabled modes list
-        return high_risk_only == risk_level
 
     def _get_buffer_distance(self, config:Dict) -> list:
         """Determine buffer distance for given mode and dataset or multiple distances if supplied"""
-        buffer_config = config['buffer']
+        if 'buffer' in config:
+            buffer_config = config['buffer']
+        else:
+            return ['buffer_1m'] # Default to 1m buffer if not supplied in dataset matrix
         
-        # If buffer is a string, return as-is regardless of mmode
+        # If buffer is a string, return as-is regardless of mode
         if isinstance(buffer_config, str):
             return [f'buffer_{buffer_config}']
         
