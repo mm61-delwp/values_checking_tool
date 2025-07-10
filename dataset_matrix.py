@@ -2,28 +2,30 @@
 # Dataset Processing Matrix
 # ============================================================================
 
-"""
-NOTE: 'buffer' can be a string, e.g. 'buffer: '1m' which will be applied to all modes
-      or a dict, e.g. 'buffer': {'DAP': '1m', 'JFMP': '50m', 'NBFT': '1m', 'LRLI': '1m'}
-      Should default to 1m if it can't find a match.
-NOTE: 'modes' is OPTIONAL. If included, the layer will be processed for any mode in the list
-      e.g. 'modes': ['DAP', 'JFMP'] will not be processed in NBFT or LRLI mode
-
-      
-DATASET:
+"""      
+DATASET DEFINITIOINS:
     'name': {
             'path': string datapath to values layer
-            'high_risk_only':       bool (Optional) - if True, only used for identified HRHI activities; default is False
+            'high_risk_only':       bool (Optional) - if True, do not process for LRLI activities; default is False
             'modes':                list (Optional) - If list populated, layer will only be processed for listed modes
             'buffer':               string or dict (Optional) - See note above; default value is '1m'
             'where_clause':         string (Optional) - SQL type selection for values; default is None
             'fields':               list - field names to include in summary
             'value_type':           string - description of value type for all values in layer
-            'value_field':          string (Optional) - field name of main value field; must exist in fields (above)     
+            'value_field':          string or list (Optional) - field name of main value field; must exist in fields (above)     
             'description_field':    string (Optional) - field name of description field; must exist in fields (above)
             'id_field':             string (Optional) - unique identifier for value instance; must exist in fields (above)
         },
-      """
+
+NOTE:   'buffer' can be:
+            - a string, e.g. 'buffer: '1m' which will be applied to all modes
+            - a dict, e.g. 'buffer': {'DAP': '1m', 'JFMP': '50m', 'NBFT': '1m'} which will apply the buffer depending on selected mode
+            - a nested dict, e.g.: 'buffer': {'DAP': '500m', 'JFMP': {'500m', '1000m_ring'}, 'NBFT': '500m'} which will separately apply each listed buffer type for the selected mode
+            - omitted, in which case overlapping (1m buffer) values will be captured
+        'value_field' can be:
+            - a string, e.g. 'COMM_NAME' resulting in CSV 'Value' = COMM_NAME, e.g. 'Broad Shield-fern'
+            - a list, e.g. ['COMM_NAME', 'SCI_NAME'] which concats fields, e.g. 'Broad Shield-fern, Polystichum formosum'
+"""
 
 DATASET_MATRIX = {
     # FORESTS THEME
@@ -53,7 +55,7 @@ DATASET_MATRIX = {
             'buffer': '10m',
             'where_clause': None,
             'fields': ["NAME", "FAC_TYPE", "SERIAL_NO"],
-            'value_type': 'REC SITES',
+            'value_type': 'RECWEB SITE',
             'value_field': 'NAME',
             'description_field': 'FAC_TYPE',
             'id_field': 'SERIAL_NO'
@@ -64,18 +66,18 @@ DATASET_MATRIX = {
             'buffer': '10m',
             'where_clause': None,
             'fields': ["NAME", "ASSET_CLS", "SERIAL_NO"],
-            'value_type': 'ASSET',
+            'value_type': 'RECWEB ASSET',
             'value_field': 'NAME',
             'description_field': 'ASSET_CLS',
             'id_field': 'SERIAL_NO'
         },
-        'recweb_historic_assets': {
+        'recweb_historic_relic': {
             'path': "{csdl}\\FORESTS.GDB\\RECWEB_HISTORIC_RELIC",
             'high_risk_only': True,
             'buffer': '10m',
             'where_clause': None,
             'fields': ["NAME", "ASSET_CLS", "SERIAL_NO"],
-            'value_type': 'RELIC',
+            'value_type': 'RECWEB HISTORIC RELIC',
             'value_field': 'NAME',
             'description_field': 'ASSET_CLS',
             'id_field': 'SERIAL_NO'
@@ -86,7 +88,7 @@ DATASET_MATRIX = {
             'buffer': '10m',
             'where_clause': None,
             'fields': ["NAME", "ASSET_CLS", "SERIAL_NO"],
-            'value_type': 'SIGN',
+            'value_type': 'RECWEB SIGN',
             'value_field': 'NAME',
             'description_field': 'ASSET_CLS',
             'id_field': 'SERIAL_NO'
@@ -97,7 +99,7 @@ DATASET_MATRIX = {
             'buffer': '10m',
             'where_clause': None,
             'fields': ["NAME", "ASSET_CLS", "SERIAL_NO"],
-            'value_type': 'CARPARK',
+            'value_type': 'RECWEB CARPARK',
             'value_field': 'NAME',
             'description_field': 'ASSET_CLS',
             'id_field': 'SERIAL_NO'
@@ -125,7 +127,7 @@ DATASET_MATRIX = {
             'path': "{csdl}\\FIRE.GDB\\BURNPLAN25",
             'where_clause': "REGION = 'Gippsland'",
             'fields': ["TREAT_NO", "TREAT_NAME", "TREAT_TYPE"],
-            'value_type': 'Joint Fuel Management Plan',
+            'value_type': 'JFMP',
             'value_field': 'TREAT_TYPE',
             'description_field': 'TREAT_NAME',
             'id_field': 'TREAT_NO'
@@ -184,7 +186,7 @@ DATASET_MATRIX = {
             'path': "{csdl}\\regional_business.gdb\\BLD_CHEMICAL_CONTROL_AREAS",
             'where_clause': None,
             'fields': ["ACCA_NAME"],
-            'value_type': 'Agricultural Chemical Control Area',
+            'value_type': 'Ag Chem Control Area',
             'value_field': 'ACCA_NAME', 
             'description_field': None,
             'id_field': None
@@ -267,9 +269,9 @@ DATASET_MATRIX = {
             'path': "{csdl}\\FLORAFAUNA1.GDB\\VBA_FLORA25",
             'buffer': {'DAP': '50m', 'JFMP': {'500m', '1000m_ring'}, 'NBFT': '50m'},
             'where_clause': "(STARTDATE > date '1980-01-01 00:00:00') AND (MAX_ACC_KM <= 0.5) AND (EPBC_DESC in ('Endangered','Vulnerable','Critically Endangered') OR OLD_VICADV in ('e','v','P','x') OR FFG in('cr','en','vu','th','cd','en-x','L'))",
-            'fields': ["SCI_NAME", "COMM_NAME", "TAXON_ID", "EXTRA_INFO", "RECORD_ID"],
+            'fields': ["SCI_NAME", "COMM_NAME", "TAXON_ID", "EXTRA_INFO", "RECORD_ID", "COLLECTOR", "FFG_DESC", "EPBC_DESC", "MAX_ACC_KM", "RECORD_ID", "STARTDATE"],
             'value_type': 'Flora',
-            'value_field': 'SCI_NAME',
+            'value_field': ['COMM_NAME', 'SCI_NAME'],
             'description_field': 'COMM_NAME',
             'id_field': 'RECORD_ID'
         },
@@ -277,9 +279,9 @@ DATASET_MATRIX = {
             'path': "{csdl_restricted}\\VBA_FLORA_THREATENED",
             'buffer': {'DAP': '50m', 'JFMP': {'500m', '1000m_ring'}, 'NBFT': '50m'},
             'where_clause': "(STARTDATE > date '1980-01-01 00:00:00') AND (MAX_ACC_KM <= 0.5)",
-            'fields': ["SCI_NAME", "COMM_NAME", "TAXON_ID", "EXTRA_INFO", "RECORD_ID"],
+            'fields': ["SCI_NAME", "COMM_NAME", "TAXON_ID", "EXTRA_INFO", "RECORD_ID", "COLLECTOR", "FFG_DESC", "EPBC_DESC", "MAX_ACC_KM", "RECORD_ID", "STARTDATE"],
             'value_type': 'Flora_Threatened',
-            'value_field': 'SCI_NAME',
+            'value_field': ['COMM_NAME', 'SCI_NAME'],
             'description_field': 'COMM_NAME',
             'id_field': 'RECORD_ID'
         },
@@ -287,9 +289,9 @@ DATASET_MATRIX = {
             'path': "{csdl_restricted}\\VBA_FLORA_RESTRICTED",
             'buffer': {'DAP': '50m', 'JFMP': {'500m', '1000m_ring'}, 'NBFT': '50m'},
             'where_clause': "(STARTDATE > date '1980-01-01 00:00:00') AND (MAX_ACC_KM <= 0.5)",
-            'fields': ["SCI_NAME", "COMM_NAME", "TAXON_ID", "EXTRA_INFO", "RECORD_ID"],
+            'fields': ["SCI_NAME", "COMM_NAME", "TAXON_ID", "EXTRA_INFO", "RECORD_ID", "COLLECTOR", "FFG_DESC", "EPBC_DESC", "MAX_ACC_KM", "RECORD_ID", "STARTDATE"],
             'value_type': 'Flora_Restricted',
-            'value_field': 'SCI_NAME',
+            'value_field': ['COMM_NAME', 'SCI_NAME'],
             'description_field': 'COMM_NAME',
             'id_field': 'RECORD_ID'
         },
@@ -300,9 +302,9 @@ DATASET_MATRIX = {
             'where_clause': "(STARTDATE > date '1980-01-01 00:00:00') AND (MAX_ACC_KM <= 0.5) AND " +
                 "(COMM_NAME in ('Masked Owl','Powerful Owl','Sooty Owl','Square-tailed Kite','Barking Owl')) AND " +
                 "(EXTRA_INFO in ('Roost site','Breeding'))",
-            'fields': ["SCI_NAME", "COMM_NAME", "TAXON_ID", "EXTRA_INFO", "RECORD_ID"],
+            'fields': ["SCI_NAME", "COMM_NAME", "TAXON_ID", "EXTRA_INFO", "RECORD_ID", "COLLECTOR", "FFG_DESC", "EPBC_DESC", "MAX_ACC_KM", "RECORD_ID", "STARTDATE"],
             'value_type': 'Fauna - Owl',
-            'value_field': 'SCI_NAME',
+            'value_field': ['COMM_NAME', 'SCI_NAME'],
             'description_field': 'COMM_NAME',
             'id_field': 'RECORD_ID'
         },
@@ -311,9 +313,9 @@ DATASET_MATRIX = {
             'buffer': {'DAP': '500m', 'JFMP': {'500m', '1000m_ring'}, 'NBFT': '500m'},
             'where_clause': "(STARTDATE > date '1980-01-01 00:00:00') AND (MAX_ACC_KM <= 0.5) AND " +
                 "(COMM_NAME = 'White-bellied Sea-Eagle') and (EXTRA_INFO in ('Roost site','Breeding'))",
-            'fields': ["SCI_NAME", "COMM_NAME", "TAXON_ID", "EXTRA_INFO", "RECORD_ID"],
+            'fields': ["SCI_NAME", "COMM_NAME", "TAXON_ID", "EXTRA_INFO", "RECORD_ID", "COLLECTOR", "FFG_DESC", "EPBC_DESC", "MAX_ACC_KM", "RECORD_ID", "STARTDATE"],
             'value_type': 'Fauna - WBSE',
-            'value_field': 'SCI_NAME',
+            'value_field': ['COMM_NAME', 'SCI_NAME'],
             'description_field': 'COMM_NAME',
             'id_field': 'RECORD_ID'
         },
@@ -322,9 +324,9 @@ DATASET_MATRIX = {
             'buffer': {'DAP': '250m', 'JFMP': {'500m', '1000m_ring'}, 'NBFT': '250m'},
             'where_clause': "(STARTDATE > date '1980-01-01 00:00:00') AND (MAX_ACC_KM <= 0.5) AND " +
                 "(COMM_NAME = 'Grey Goshawk') and (EXTRA_INFO in ('Roost site','Breeding'))",
-            'fields': ["SCI_NAME", "COMM_NAME", "TAXON_ID", "EXTRA_INFO", "RECORD_ID"],
+            'fields': ["SCI_NAME", "COMM_NAME", "TAXON_ID", "EXTRA_INFO", "RECORD_ID", "COLLECTOR", "FFG_DESC", "EPBC_DESC", "MAX_ACC_KM", "RECORD_ID", "STARTDATE"],
             'value_type': 'Fauna - G',
-            'value_field': 'SCI_NAME',
+            'value_field': ['COMM_NAME', 'SCI_NAME'],
             'description_field': 'COMM_NAME',
             'id_field': 'RECORD_ID'
         },
@@ -334,9 +336,9 @@ DATASET_MATRIX = {
             'where_clause': "(STARTDATE > date '1980-01-01 00:00:00') AND (MAX_ACC_KM <= 0.5) AND " +
                 "(COMM_NAME in ('Grey-headed Flying-fox','Eastern Horseshoe Bat','Common Bent-wing Bat','Eastern Bent-winged Bat')) and " + 
                 "(EXTRA_INFO in ('Roost site','Breeding'))",
-            'fields': ["SCI_NAME", "COMM_NAME", "TAXON_ID", "EXTRA_INFO", "RECORD_ID"],
+            'fields': ["SCI_NAME", "COMM_NAME", "TAXON_ID", "EXTRA_INFO", "RECORD_ID", "COLLECTOR", "FFG_DESC", "EPBC_DESC", "MAX_ACC_KM", "RECORD_ID", "STARTDATE"],
             'value_type': 'Fauna',
-            'value_field': 'SCI_NAME',
+            'value_field': ['COMM_NAME', 'SCI_NAME'],
             'description_field': 'COMM_NAME',
             'id_field': 'RECORD_ID'
         },
@@ -344,9 +346,9 @@ DATASET_MATRIX = {
             'path': "{csdl}\\FLORAFAUNA1.GDB\\VBA_FAUNA25",
             'buffer': {'DAP': '50m', 'JFMP': {'500m', '1000m_ring'}, 'NBFT': '50m'},
             'where_clause': "(STARTDATE > date '1980-01-01 00:00:00') AND (MAX_ACC_KM <= 0.5) AND (EPBC_DESC in ('Endangered','Vulnerable','Critically Endangered') OR OLD_VICADV in ('cr','en','vu','wx') OR FFG in ('cr','en','vu','th','cd','en-x','L') OR COMM_NAME = 'Koala')",
-            'fields': ["SCI_NAME", "COMM_NAME", "TAXON_ID", "EXTRA_INFO", "RECORD_ID"],
+            'fields': ["SCI_NAME", "COMM_NAME", "TAXON_ID", "EXTRA_INFO", "RECORD_ID", "COLLECTOR", "FFG_DESC", "EPBC_DESC", "MAX_ACC_KM", "RECORD_ID", "STARTDATE"],
             'value_type': 'Fauna',
-            'value_field': 'SCI_NAME',
+            'value_field': ['COMM_NAME', 'SCI_NAME'],
             'description_field': 'COMM_NAME',
             'id_field': 'RECORD_ID'
         },
@@ -357,9 +359,9 @@ DATASET_MATRIX = {
             'where_clause': "(STARTDATE > date '1980-01-01 00:00:00') AND (MAX_ACC_KM <= 0.5) AND " +
                 "(COMM_NAME in ('Masked Owl','Powerful Owl','Sooty Owl','Square-tailed Kite','Barking Owl')) AND " +
                 "(EXTRA_INFO in ('Roost site','Breeding'))",
-            'fields': ["SCI_NAME", "COMM_NAME", "TAXON_ID", "EXTRA_INFO", "RECORD_ID"],
+            'fields': ["SCI_NAME", "COMM_NAME", "TAXON_ID", "EXTRA_INFO", "RECORD_ID", "COLLECTOR", "FFG_DESC", "EPBC_DESC", "MAX_ACC_KM", "RECORD_ID", "STARTDATE"],
             'value_type': 'Fauna_Threatened',
-            'value_field': 'SCI_NAME',
+            'value_field': ['COMM_NAME', 'SCI_NAME'],
             'description_field': 'COMM_NAME',
             'id_field': 'RECORD_ID'
         },
@@ -368,9 +370,9 @@ DATASET_MATRIX = {
             'buffer': {'DAP': '500m', 'JFMP': {'500m', '1000m_ring'}, 'NBFT': '500m'},
             'where_clause': "(STARTDATE > date '1980-01-01 00:00:00') AND (MAX_ACC_KM <= 0.5) AND " +
                 "(COMM_NAME = 'White-bellied Sea-Eagle') and (EXTRA_INFO in ('Roost site','Breeding'))",
-            'fields': ["SCI_NAME", "COMM_NAME", "TAXON_ID", "EXTRA_INFO", "RECORD_ID"],
+            'fields': ["SCI_NAME", "COMM_NAME", "TAXON_ID", "EXTRA_INFO", "RECORD_ID", "COLLECTOR", "FFG_DESC", "EPBC_DESC", "MAX_ACC_KM", "RECORD_ID", "STARTDATE"],
             'value_type': 'Fauna_Threatened',
-            'value_field': 'SCI_NAME',
+            'value_field': ['COMM_NAME', 'SCI_NAME'],
             'description_field': 'COMM_NAME',
             'id_field': 'RECORD_ID'
         },
@@ -379,9 +381,9 @@ DATASET_MATRIX = {
             'buffer': {'DAP': '250m', 'JFMP': {'500m', '1000m_ring'}, 'NBFT': '250m'},
             'where_clause': "(STARTDATE > date '1980-01-01 00:00:00') AND (MAX_ACC_KM <= 0.5) AND " +
                 "(COMM_NAME = 'Grey Goshawk') and (EXTRA_INFO in ('Roost site','Breeding'))",
-            'fields': ["SCI_NAME", "COMM_NAME", "TAXON_ID", "EXTRA_INFO", "RECORD_ID"],
+            'fields': ["SCI_NAME", "COMM_NAME", "TAXON_ID", "EXTRA_INFO", "RECORD_ID", "COLLECTOR", "FFG_DESC", "EPBC_DESC", "MAX_ACC_KM", "RECORD_ID", "STARTDATE"],
             'value_type': 'Fauna_Threatened',
-            'value_field': 'SCI_NAME',
+            'value_field': ['COMM_NAME', 'SCI_NAME'],
             'description_field': 'COMM_NAME',
             'id_field': 'RECORD_ID'
         },
@@ -391,9 +393,9 @@ DATASET_MATRIX = {
             'where_clause': "(STARTDATE > date '1980-01-01 00:00:00') AND (MAX_ACC_KM <= 0.5) AND " +
                 "(COMM_NAME in ('Grey-headed Flying-fox','Eastern Horseshoe Bat','Common Bent-wing Bat','Eastern Bent-winged Bat')) and " + 
                 "(EXTRA_INFO in ('Roost site','Breeding'))",
-            'fields': ["SCI_NAME", "COMM_NAME", "TAXON_ID", "EXTRA_INFO", "RECORD_ID"],
+            'fields': ["SCI_NAME", "COMM_NAME", "TAXON_ID", "EXTRA_INFO", "RECORD_ID", "COLLECTOR", "FFG_DESC", "EPBC_DESC", "MAX_ACC_KM", "RECORD_ID", "STARTDATE"],
             'value_type': 'Fauna_Threatened',
-            'value_field': 'SCI_NAME',
+            'value_field': ['COMM_NAME', 'SCI_NAME'],
             'description_field': 'COMM_NAME',
             'id_field': 'RECORD_ID'
         },
@@ -401,9 +403,9 @@ DATASET_MATRIX = {
             'path': "{csdl_restricted}\\VBA_FAUNA_THREATENED",
             'buffer': {'DAP': '50m', 'JFMP': {'500m', '1000m_ring'}, 'NBFT': '50m'},
             'where_clause': "(STARTDATE > date '1980-01-01 00:00:00') AND (MAX_ACC_KM <= 0.5)",
-            'fields': ["SCI_NAME", "COMM_NAME", "TAXON_ID", "EXTRA_INFO", "RECORD_ID"],
+            'fields': ["SCI_NAME", "COMM_NAME", "TAXON_ID", "EXTRA_INFO", "RECORD_ID", "COLLECTOR", "FFG_DESC", "EPBC_DESC", "MAX_ACC_KM", "RECORD_ID", "STARTDATE"],
             'value_type': 'Fauna_Threatened',
-            'value_field': 'SCI_NAME',
+            'value_field': ['COMM_NAME', 'SCI_NAME'],
             'description_field': 'COMM_NAME',
             'id_field': 'RECORD_ID'
         },
@@ -414,9 +416,9 @@ DATASET_MATRIX = {
             'where_clause': "(STARTDATE > date '1980-01-01 00:00:00') AND (MAX_ACC_KM <= 0.5) AND " +
                 "(COMM_NAME in ('Masked Owl','Powerful Owl','Sooty Owl','Square-tailed Kite','Barking Owl')) AND " +
                 "(EXTRA_INFO in ('Roost site','Breeding'))",
-            'fields': ["SCI_NAME", "COMM_NAME", "TAXON_ID", "EXTRA_INFO", "RECORD_ID"],
+            'fields': ["SCI_NAME", "COMM_NAME", "TAXON_ID", "EXTRA_INFO", "RECORD_ID", "COLLECTOR", "FFG_DESC", "EPBC_DESC", "MAX_ACC_KM", "RECORD_ID", "STARTDATE"],
             'value_type': 'Fauna_Restricted',
-            'value_field': 'SCI_NAME',
+            'value_field': ['COMM_NAME', 'SCI_NAME'],
             'description_field': 'COMM_NAME',
             'id_field': 'RECORD_ID'
         },
@@ -425,9 +427,9 @@ DATASET_MATRIX = {
             'buffer': {'DAP': '500m', 'JFMP': {'500m', '1000m_ring'}, 'NBFT': '500m'},
             'where_clause': "(STARTDATE > date '1980-01-01 00:00:00') AND (MAX_ACC_KM <= 0.5) AND " +
                 "(COMM_NAME = 'White-bellied Sea-Eagle') and (EXTRA_INFO in ('Roost site','Breeding'))",
-            'fields': ["SCI_NAME", "COMM_NAME", "TAXON_ID", "EXTRA_INFO", "RECORD_ID"],
+            'fields': ["SCI_NAME", "COMM_NAME", "TAXON_ID", "EXTRA_INFO", "RECORD_ID", "COLLECTOR", "FFG_DESC", "EPBC_DESC", "MAX_ACC_KM", "RECORD_ID", "STARTDATE"],
             'value_type': 'Fauna_Restricted',
-            'value_field': 'SCI_NAME',
+            'value_field': ['COMM_NAME', 'SCI_NAME'],
             'description_field': 'COMM_NAME',
             'id_field': 'RECORD_ID'
         },
@@ -436,9 +438,9 @@ DATASET_MATRIX = {
             'buffer': {'DAP': '250m', 'JFMP': {'500m', '1000m_ring'}, 'NBFT': '250m'},
             'where_clause': "(STARTDATE > date '1980-01-01 00:00:00') AND (MAX_ACC_KM <= 0.5) AND " +
                 "(COMM_NAME = 'Grey Goshawk') and (EXTRA_INFO in ('Roost site','Breeding'))",
-            'fields': ["SCI_NAME", "COMM_NAME", "TAXON_ID", "EXTRA_INFO", "RECORD_ID"],
+            'fields': ["SCI_NAME", "COMM_NAME", "TAXON_ID", "EXTRA_INFO", "RECORD_ID", "COLLECTOR", "FFG_DESC", "EPBC_DESC", "MAX_ACC_KM", "RECORD_ID", "STARTDATE"],
             'value_type': 'Fauna_Restricted',
-            'value_field': 'SCI_NAME',
+            'value_field': ['COMM_NAME', 'SCI_NAME'],
             'description_field': 'COMM_NAME',
             'id_field': 'RECORD_ID'
         },
@@ -448,9 +450,9 @@ DATASET_MATRIX = {
             'where_clause': "(STARTDATE > date '1980-01-01 00:00:00') AND (MAX_ACC_KM <= 0.5) AND " +
                 "(COMM_NAME in ('Grey-headed Flying-fox','Eastern Horseshoe Bat','Common Bent-wing Bat','Eastern Bent-winged Bat')) and " + 
                 "(EXTRA_INFO in ('Roost site','Breeding'))",
-            'fields': ["SCI_NAME", "COMM_NAME", "TAXON_ID", "EXTRA_INFO", "RECORD_ID"],
+            'fields': ["SCI_NAME", "COMM_NAME", "TAXON_ID", "EXTRA_INFO", "RECORD_ID", "COLLECTOR", "FFG_DESC", "EPBC_DESC", "MAX_ACC_KM", "RECORD_ID", "STARTDATE"],
             'value_type': 'Fauna_Restricted',
-            'value_field': 'SCI_NAME',
+            'value_field': ['COMM_NAME', 'SCI_NAME'],
             'description_field': 'COMM_NAME',
             'id_field': 'RECORD_ID'
         },
@@ -461,9 +463,9 @@ DATASET_MATRIX = {
                 "(COMM_NAME not in ('Masked Owl','Powerful Owl','Sooty Owl','Square-tailed Kite','Barking Owl'," + 
                 "'Grey-headed Flying-fox','Eastern Horseshoe Bat','Common Bent-wing Bat','Eastern Bent-winged Bat'," +
                 "'White-bellied Sea-Eagle','Grey Goshawk'))",
-            'fields': ["SCI_NAME", "COMM_NAME", "TAXON_ID", "EXTRA_INFO", "RECORD_ID"],
+            'fields': ["SCI_NAME", "COMM_NAME", "TAXON_ID", "EXTRA_INFO", "RECORD_ID", "COLLECTOR", "FFG_DESC", "EPBC_DESC", "MAX_ACC_KM", "RECORD_ID", "STARTDATE"],
             'value_type': 'Fauna_Restricted',
-            'value_field': 'SCI_NAME',
+            'value_field': ['COMM_NAME', 'SCI_NAME'],
             'description_field': 'COMM_NAME',
             'id_field': 'RECORD_ID'
         },
@@ -601,7 +603,7 @@ DATASET_MATRIX = {
             'where_clause': None,
             'fields': ["SCI_NAME", "COMM_NAME", "TAXON_ID"],
             'value_type': 'Aquatic',
-            'value_field': 'SCI_NAME',
+            'value_field': ['COMM_NAME', 'SCI_NAME'],
             'description_field': 'COMM_NAME',
             'id_field': 'TAXON_ID'
         }
@@ -711,7 +713,8 @@ DATASET_MATRIX = {
     'water': {
         'watercourse': {
             'path': "{csdl}\\VMHYDRO.gdb\\HY_WATERCOURSE",
-            'where_clause': None,
+            'where_clause': "FEATURE_TYPE_CODE <> '' OR FEATURE_TYPE_CODE IS NOT NULL",
+            'fields': ["NAME", "FEATURE_TYPE_CODE"],
             'value_type': 'Watercourse',
             'value_field': 'NAME',
             'description_field': 'FEATURE_TYPE_CODE',

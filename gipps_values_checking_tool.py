@@ -11,10 +11,11 @@ import logging
 import os
 from pathlib import Path
 from datetime import datetime
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Union
 from dataclasses import dataclass
 
 from dataset_matrix import DATASET_MATRIX
+from qbid_matrix import QBID_MATRIX, QBID2_MATRIX
 from mitigations import FOREST_MITIGATIONS, HERITAGE_MITIGATIONS, NATIVE_TITLE_MATRIX
 
 
@@ -37,18 +38,20 @@ class Settings:
         self.workspace = Path(self.workspace)
         self.workspace.mkdir(exist_ok=True)
 
-
-@dataclass # !! NOTE: should be updated (or maybe deleted?)
+@dataclass
 class DatasetConfig:
     """Configuration for a single dataset"""
+    # Note: this is important for parsing dataset matrix and assigning default/optional values
     path: str
-    buffer: str 
-    where_clause: Optional[str]
     fields: List[str]
     value_type: str
-    value_field: str
+    buffer: Union[str, Dict[str, Union[str, set[str]]]] = '1m'
+    where_clause: Optional[str] = None
+    value_field: Optional[str] = None
     description_field: Optional[str] = None
     id_field: Optional[str] = None
+    high_risk_only: bool = False
+    modes: Optional[List[str]] = None
 
 
 # ============================================================================
@@ -93,6 +96,7 @@ class ValuesChecker:
                 theme_results = self._process_single_theme(theme, buffered_layers)
                 all_results[theme] = theme_results
                 self.logger.info(f"Found {len(theme_results)} values for {theme} theme")
+                print("-" * 60)
             
             # Phase 3: Apply Mitigations
             self.logger.info("Phase 3: Applying mitigations...")
@@ -124,7 +128,7 @@ class ValuesChecker:
             arcpy.env.workspace = str(output_gdb)
 
             # Clear existing data
-            self.logger.warning("File class deletion disabled for debugging - fix this later")
+            self.logger.warning("Dataset deletion disabled for debugging - fix this later")
             for fc in arcpy.ListFeatureClasses(): 
                 a = 1 # arcpy.management.Delete(fc) # !! NOTE: Temporarily disabled for faster debugging
             for tbl in arcpy.ListTables(): 
@@ -148,7 +152,8 @@ class ValuesChecker:
         # Add and calculate geometry fields
         self._add_geometry_fields(working_copy)
         self.temp_datasets.append(working_copy)
-        self.logger.info(f"{self.settings.input_data} cleaned and copied")
+        count_feat = arcpy.GetCount_management(working_copy)
+        self.logger.info(f"{self.settings.input_data} cleaned and copied ({count_feat} features)")
         
         return working_copy
     
@@ -217,102 +222,73 @@ class ValuesChecker:
         
         for dataset_name, config in theme_datasets.items():
             try:
+                # Unpack configuration fields, applying defaults & type
+                config = DatasetConfig(**config)
+
                 if self._is_dataset_enabled_for_mode(config):
-                    for buffer in self._get_buffer_distance(config):
+                    for buffer in self._get_buffer_list(config):
                         dataset_results = self._process_single_dataset(dataset_name, config, buffer, buffered_layers, theme)
                         all_theme_results.extend(dataset_results)
-                        self.logger.info(f"Processed {dataset_name} with {buffer}: {len(dataset_results)} values found")
+                        self.logger.info(f"Processed {dataset_name} with {buffer[7:]} buffer: {len(dataset_results)} values found")
                 else:
-                    self.logger.info(f"Skipped {dataset_name} as it is disabled in {mode} mode")
+                    self.logger.info(f"Skipped {dataset_name} as it is disabled in {MODE} mode")
             except Exception as e:
                 self.logger.warning(f"Failed to process {dataset_name}: {e}")
 
         return all_theme_results
     
     def _process_single_dataset(self, dataset_name: str, config: DatasetConfig, 
-                               buffer_distance: str, buffered_layers: Dict[str, str], theme: str) -> List[Dict]:
+                           buffer_name: str, buffered_layers: Dict[str, str], theme: str) -> List[Dict]:
         """Process a single dataset using its configuration"""
         
         # Step 1: Resolve dataset path and check existence
-        dataset_path = config['path'].format(**DATA_PATHS)
+        values_layer_path = config.path.format(**DATA_PATHS)
 
-        if not arcpy.Exists(dataset_path):
-            self.logger.warning(f"Dataset not found: {dataset_path}")
+        if not arcpy.Exists(values_layer_path):
+            self.logger.warning(f"Dataset not found: {values_layer_path}")
             return []
         
         # Step 2: Apply selection criteria to values layer if specified
-        selection_criteria = config['where_clause'] or None
+        values_layer = values_layer_path
+        if config.where_clause:
+            values_layer = arcpy.management.SelectLayerByAttribute(values_layer_path, "NEW_SELECTION", config.where_clause)
+
+        # Step 3: Apply LRLI filter to works layer if specified
+        if config.high_risk_only:
+            works_layer = arcpy.management.SelectLayerByAttribute(buffer_name, "NEW_SELECTION", f"{RISK_LEVEL_FIELD} <> 'LRLI'")
+        else:
+            works_layer = buffer_name
+
+        # Step 4: quick check of how many features remain after selection/filtering
+        values_count = int(arcpy.GetCount_management(values_layer)[0])
+        works_count = int(arcpy.GetCount_management(works_layer)[0])
         
-        if selection_criteria:
-            source_dataset = self._apply_selection_criteria(dataset_name, dataset_path, selection_criteria)
+        # Step 5: Perform spatial intersection
+        if values_count > 0:
+            intersect_output = f"intersect_{dataset_name}_{buffer_name}"
+            intersect_result = arcpy.analysis.Intersect([works_layer, values_layer], intersect_output, "ALL")
+            self.temp_datasets.append(intersect_output)
         else:
-            source_dataset = dataset_path
-
-        # Step 3: Perform spatial intersection
-        if 'high_risk_only' in config:
-            ignore_lrli = config['high_risk_only'] # If specified in dataset matrix, process features as specified (True or False)
-        else:
-            ignore_lrli = False # If not specified in dataset matrix, default includes all features
-
-        intersect_result = self._perform_spatial_intersection(dataset_name, source_dataset, buffer_distance, ignore_lrli)
-
-        # Step 4: Extract and return results
-        if intersect_result:
-            return self._extract_results_from_intersection(dataset_name, intersect_result, config, theme, buffer_distance)
-        else:
+            self.logger.warning(f"No features after selection criteria: {dataset_name}, {config.where_clause}")
             return []
-    
-    def _apply_selection_criteria(self, dataset_name: str, dataset_path: str, where_clause: Optional[str]) -> str:
-        """Apply selection criteria to dataset if specified"""
-        if where_clause: 
-            selected_dataset = f"selected_{dataset_name}"
-            arcpy.conversion.FeatureClassToFeatureClass(
-                dataset_path, arcpy.env.workspace, selected_dataset, where_clause
-            )
-            self.temp_datasets.append(selected_dataset)
-            return selected_dataset
-        else:
-            return dataset_path
-    
-    def _perform_spatial_intersection(self, dataset_name: str, source_dataset: str, buffer_layer: str, ignore_lrli: bool) -> Optional[str]:
-        """Perform spatial intersection between datasets"""
-        intersect_result = f"intersect_{dataset_name}_{buffer_layer}"
         
-        try:
-            if ignore_lrli:
-                # filter out LRLI activities if not required
-                filter = f"{RISK_LEVEL_FIELD} <> 'LRLI'"
-                arcpy.management.SelectLayerByAttribute(buffer_layer, "NEW_SELECTION", filter)
-                arcpy.analysis.Intersect([buffer_layer, source_dataset], intersect_result, "ALL")
-                arcpy.management.SelectLayerByAttribute(buffer_layer, "CLEAR_SELECTION")
-            else:
-                arcpy.analysis.Intersect([buffer_layer, source_dataset], intersect_result, "ALL")
+        # self.logger.info(f"Number of works features in {buffer_name}: {works_count}")
+        # self.logger.info(f"Number of values features in {dataset_name}: {values_count}")
 
-            # add intersection to results
-            self.temp_datasets.append(intersect_result)
-            return intersect_result
-            
-        except Exception as e:
-            self.logger.warning(f"Intersect failed for {dataset_name}, trying clip: {e}")
-            
-            # Fallback to clip
-            try:
-                arcpy.analysis.Clip(source_dataset, buffer_layer, intersect_result)
-                self.temp_datasets.append(intersect_result)
-                return intersect_result
-            except Exception as e2:
-                self.logger.error(f"Both intersect and clip failed for {dataset_name}: {e2}")
-                return None
+        # Step 6: Extract and return results
+        if intersect_result:
+            return self._extract_results_from_intersection(dataset_name, intersect_result, config, theme, buffer_name)
+        else:
+            self.logger.warning(f"No intersections between: {buffer_name}, {dataset_name}")
+            return []
     
     def _extract_results_from_intersection(self, dataset_name: str, intersect_result: str, config: DatasetConfig, theme: str, buffer_layer: str) -> List[Dict]:
         """Extract structured results from intersection output"""
         
-        # List of intersection fields for validation
-        available_fields = [f.name for f in arcpy.ListFields(intersect_result)]
-        
-        # List of fields we want to keep
-        valid_fields = [ID_FIELD, NAME_FIELD, DISTRICT_FIELD, RISK_LEVEL_FIELD]         # add standard fields
-        valid_fields.extend([f for f in config['fields'] if f in available_fields])     # add values configuration fields that exist in intersection
+        # Prepare and validate fields
+        available_fields = [f.name for f in arcpy.ListFields(intersect_result)]   # List all intersecting fields
+        valid_fields = [ID_FIELD, NAME_FIELD, DESCRIPTION_FIELD, DISTRICT_FIELD, RISK_LEVEL_FIELD]   # list standard fields
+        valid_fields.extend([f for f in config.fields if f in available_fields])  # add values configuration fields that exist in intersection
         
         if len(valid_fields) < 3:  # Need at least DAP_REF_NO, DAP_NAME, DISTRICT
             self.logger.warning(f"Insufficient fields available for {intersect_result}")
@@ -321,6 +297,8 @@ class ValuesChecker:
         # Dissolve features to deal with e.g. multiple intersections with same SMZ
         dissolve_result = f"dissolve_{dataset_name}"
         arcpy.analysis.PairwiseDissolve(intersect_result, dissolve_result, dissolve_field=valid_fields, multi_part="MULTI_PART")
+        self._add_geometry_fields(dissolve_result)
+        valid_fields.extend(['X', 'Y'])  # add coordinate fields to list of fields
         self.temp_datasets.append(dissolve_result)
 
         # Extract data using cursor
@@ -330,66 +308,84 @@ class ValuesChecker:
                 if not row[0]:  # Skip if no ID_FIELD
                     continue
                 
-                # Build base result structure
-                result = self._build_base_result(row, valid_fields, config, theme, buffer_layer)
-                
-                # Add theme-specific fields - additional detail for biodiversity & heritage themes
-                self._add_theme_specific_fields(result, row, valid_fields, theme)
+                # Build result in desired format
+                result = self._build_result(row, valid_fields, config, theme, buffer_layer)
                 
                 # add to output
                 results.append(result)
 
         return results
     
-    def _build_base_result(self, row: tuple, valid_fields: List[str], config: DatasetConfig, theme: str, buffer_layer: str) -> Dict:
+    def _build_result(self, row: tuple, valid_fields: List[str], config: DatasetConfig, theme: str, buffer_layer: str) -> Dict:
         """Build the base result structure common to all themes"""
         result = {
-            'ID': row[0],
+            'UNIQUE_ID': row[0],
+            'DISTRICT': row[3] if len(row) > 3 else '',
             'NAME': row[1] if len(row) > 1 else '',
-            'DISTRICT': row[2] if len(row) > 2 else '',
-            'RISK_LVL': row[3] if len(row) > 3 else '',
+            'DESCRIPTION': row[2] if len(row) > 2 else '',
+            'RISK_LVL': row[4] if len(row) > 4 else '',
             'Theme': theme,
-            'Value_Type': config['value_type'],
-            'Buffer': buffer_layer
+            'Value_Type': config.value_type,
+            'Buffer': buffer_layer[7:], # Shorten buffer string, removing "buffer_" prefix,
+            'Value': None,
+            'Value_Description': None,
+            'Value_ID': None,
+            'X': None,
+            'Y': None,
+            'QBID': None,
+            'QBID_Alt': None
         }
         
-        # Add value field
-        value_field_idx = self._get_field_index(valid_fields, config['value_field'])
-        if value_field_idx is not None and value_field_idx < len(row) and row[value_field_idx]:
-            result['Value'] = row[value_field_idx]
+        # Add value field data from value field or fields
+        if isinstance(config.value_field, str):
+            # single value field; return single value to 'Value' field
+            value_field_idx = self._get_field_index(valid_fields, config.value_field)
+            if value_field_idx is not None and value_field_idx < len(row) and row[value_field_idx]:
+                result['Value'] = row[value_field_idx]
+        elif isinstance(config.value_field, list):
+            # multiple value fields; concatenate into 'Value' field with ', ' separator
+            vf_values = []
+            for vf in config.value_field:
+                value_field_idx = self._get_field_index(valid_fields, vf)
+                if value_field_idx is not None and value_field_idx < len(row) and row[value_field_idx]:
+                    vf_values.append(row[value_field_idx])
+            vf_string = ", ".join(str(item) for item in vf_values)
+            result['Value'] = vf_string
         
         # Add description field if specified
-        if config['description_field']:
-            desc_field_idx = self._get_field_index(valid_fields, config['description_field'])
+        if config.description_field:
+            desc_field_idx = self._get_field_index(valid_fields, config.description_field)
             if desc_field_idx is not None and desc_field_idx < len(row) and row[desc_field_idx]:
                 result['Value_Description'] = row[desc_field_idx]
         
+        # Add X and Y Coordinates (as integers)
+            result['X'] = int(row[self._get_field_index(valid_fields, 'X')] or 0)
+            result['Y'] = int(row[self._get_field_index(valid_fields, 'Y')] or 0)
+
         # Add ID field if specified
-        if config['id_field']:
-            id_field_idx = self._get_field_index(valid_fields, config['id_field'])
+        if config.id_field:
+            id_field_idx = self._get_field_index(valid_fields, config.id_field)
             if id_field_idx is not None and id_field_idx < len(row) and row[id_field_idx]:
                 result['Value_ID'] = row[id_field_idx]
         
+        # Add any aditional fields specified in dataset configuration
+        for fieldname in config.fields:
+            if fieldname not in result: 
+                if fieldname not in [config.value_field, config.id_field, config.description_field]:
+                    id_field_idx = self._get_field_index(valid_fields, fieldname)
+                    if id_field_idx is not None and id_field_idx < len(row) and row[id_field_idx]:
+                        result[fieldname] = row[id_field_idx]
+        
+        # calculate quickbase id code
+        result['QBID_Test'] = self._build_quickbase_id(result, theme)
+
+        # alternative QBID
+        qbid_fields = ["UNIQUE_ID", "Value_Type", "Value", "Value_ID", "X", "Y"]
+        qbid_string = "|".join(str(result[item]) for item in qbid_fields if result[item] not in [None, "", 0])
+        result['QBID_Alt'] = qbid_string
+        
         return result
     
-    def _add_theme_specific_fields(self, result: Dict, row: tuple, valid_fields: List[str], theme: str):
-        """Add theme-specific fields to the result"""
-        if theme == 'biodiversity':
-            bio_fields = ['SCI_NAME', 'COMM_NAME', 'TAXON_ID', 'EXTRA_INFO', 'RECORD_ID']
-            for bio_field in bio_fields:
-                field_idx = self._get_field_index(valid_fields, bio_field)
-                if field_idx is not None and field_idx < len(row):
-                    result[bio_field] = row[field_idx]
-        
-        elif theme == 'heritage':
-            heritage_fields = ['COMPONENT_NO', 'PLACE_NAME', 'COMPONENT_TYPE', 'DATE_MODIFIED', 'FIRE_SENSITIVITY']
-            for heritage_field in heritage_fields:
-                field_idx = self._get_field_index(valid_fields, heritage_field)
-                if field_idx is not None and field_idx < len(row):
-                    if heritage_field == 'COMPONENT_NO':
-                        result['ACHRIS_ID'] = row[field_idx]
-                    else:
-                        result[heritage_field] = row[field_idx]
     
     # ========================================================================
     # Phase 3: Mitigation Application Methods
@@ -459,6 +455,8 @@ class ValuesChecker:
         # Generate works detail report
         works_csv = self._create_works_detail_report(working_data)
         outputs.append(works_csv)
+
+        # Generate QuickBase reports
         
         # Generate output shapefile
         shapefile = self._create_output_shapefile(working_data)
@@ -481,7 +479,7 @@ class ValuesChecker:
     def _create_works_detail_report(self, working_data: str) -> str:
         """Create detailed CSV report of all works"""
         works_data = []
-        #fields = ["DAP_REF_NO", "DAP_NAME", "DESCRIPTION", "RISK_LVL", "DISTRICT", "AREA_HA", "Easting", "Northing"]
+        fields = [ID_FIELD, NAME_FIELD, DESCRIPTION_FIELD, RISK_LEVEL_FIELD, DISTRICT_FIELD, "AREA_HA", "X", "Y"]
         
         with arcpy.da.SearchCursor(working_data, fields) as cursor:
             for row in cursor:
@@ -513,11 +511,33 @@ class ValuesChecker:
     # Utility and Helper Methods
     # ========================================================================
     
+    def _build_quickbase_id(self, rowdata:dict, theme:str) -> str:
+        try:        
+            qbid_fields = QBID_MATRIX[MODE][theme]
+            qbid_string = "|".join(str(rowdata[item]) for item in qbid_fields if rowdata[item] not in [None, "", 0])
+            
+            return qbid_string
+        
+        except Exception as e:
+            a=1
+            # self.logger.warning(f"Failed to generate QBID: {e}")
+        
+        try:
+            qbid_fields = ["UNIQUE_ID", "Value_Type", "Value", "Value_ID"]
+            qbid_string = "|".join(str(rowdata[item]) for item in qbid_fields if rowdata[item] not in [None, "", 0])
+
+            return qbid_string
+        
+        except Exception as e:
+            # self.logger.warning(f"Failed to generate QBID: {e}")
+            
+            return rowdata['UNIQUE_ID']
+
     def _setup_arcpy_environment(self):
         """Configure ArcPy environment settings"""
         arcpy.env.overwriteOutput = True
         arcpy.env.scriptWorkspace = str(self.settings.workspace)
-        arcpy.env.parallelProcessingFactor = "75%"
+        arcpy.env.parallelProcessingFactor = "85%"
         arcpy.SetLogHistory(False)
         
         # Set spatial reference to VICGRID2020
@@ -525,24 +545,65 @@ class ValuesChecker:
         arcpy.env.outputCoordinateSystem = sr
     
     def _add_geometry_fields(self, feature_class: str):
-        """Add and calculate geometry fields for the feature class"""
+        """Add and calculate geometry fields for the feature class based on geometry type"""
         try:
-            # Add fields
-            arcpy.management.AddField(feature_class, "Easting", "DOUBLE")
-            arcpy.management.AddField(feature_class, "Northing", "DOUBLE")
-            arcpy.management.AddField(feature_class, "AREA_HA", "DOUBLE")
+            # Add coordinate fields to all feature classes
+            arcpy.management.AddField(feature_class, "X", "DOUBLE")
+            arcpy.management.AddField(feature_class, "Y", "DOUBLE")
             
-            # Calculate geometry
-            with arcpy.da.UpdateCursor(feature_class, ["Easting", "SHAPE@X", "Northing", "SHAPE@Y", "AREA_HA", "SHAPE@"]) as cursor:
-                for row in cursor:
-                    row[0] = int(row[1]) if row[1] else 0  # Easting
-                    row[2] = int(row[3]) if row[3] else 0  # Northing
-                    row[4] = row[5].getArea('GEODESIC', 'HECTARES') if row[5] else 0  # Area in hectares
-                    cursor.updateRow(row)
-                    
+            # Get the geometry type of the feature class
+            desc = arcpy.Describe(feature_class)
+            geometry_type = desc.shapeType.upper()
+            
+            # Add and populate appropriate fields based on geometry type
+            if geometry_type in ["POINT", "MULTIPOINT"]:
+
+                # Calculate point coordinates
+                with arcpy.da.UpdateCursor(feature_class, ["X", "SHAPE@X", "Y", "SHAPE@Y"]) as cursor:
+                    for row in cursor:
+                        row[0] = int(row[1]) if row[1] else 0  # Easting
+                        row[2] = int(row[3]) if row[3] else 0  # Northing
+                        cursor.updateRow(row)
+                        
+            elif geometry_type == "POLYGON":
+                arcpy.management.AddField(feature_class, "AREA_HA", "DOUBLE")
+                
+                # Calculate polygon centroid and area
+                with arcpy.da.UpdateCursor(feature_class, ["X", "Y", "AREA_HA", "SHAPE@"]) as cursor:
+                    for row in cursor:
+                        if row[3]:  # Check if geometry exists
+                            centroid = row[3].centroid
+                            # row[0] = int(centroid.X) if centroid.X else 0  # Easting
+                            # row[1] = int(centroid.Y) if centroid.Y else 0  # Northing
+                            row[2] = row[3].getArea('GEODESIC', 'HECTARES')  # Area in hectares
+                        else:
+                            row[0] = row[1] = row[2] = 0
+                        cursor.updateRow(row)
+                        
+            elif geometry_type == "POLYLINE":
+                arcpy.management.AddField(feature_class, "LENGTH_KM", "DOUBLE")
+
+                # Calculate line midpoint and length
+                with arcpy.da.UpdateCursor(feature_class, ["X", "Y", "LENGTH_KM", "SHAPE@"]) as cursor:
+                    for row in cursor:
+                        if row[3]:  # Check if geometry exists
+                            # Get midpoint of the line
+                            midpoint = row[3].positionAlongLine(0.5, True).firstPoint
+                            row[0] = int(midpoint.X) if midpoint.X else 0  # Easting
+                            row[1] = int(midpoint.Y) if midpoint.Y else 0  # Northing
+                            row[2] = row[3].getLength('GEODESIC', 'KILOMETERS')  # Length 
+                        else:
+                            row[0] = row[1] = row[2] = 0
+                        cursor.updateRow(row)
+            else:
+                self.logger.warning(f"Unsupported geometry type: {geometry_type}")
+                return
+                
+            # self.logger.info(f"Added geometry fields for {geometry_type} feature class: {feature_class}")
+            
         except Exception as e:
             self.logger.warning(f"Could not add geometry fields: {e}")
-    
+
     def _get_field_index(self, field_list: List[str], field_name: str) -> Optional[int]:
         """Get the index of a field in the field list"""
         try:
@@ -552,33 +613,25 @@ class ValuesChecker:
     
     def _is_dataset_enabled_for_mode(self, config: Dict) -> bool:
         """Check if a dataset is enabled for the current mode"""
-        enabled_modes = config.get('modes', [])
-        
+
         # If no enabled_modes specified, assume enabled for all modes
-        if not enabled_modes:
+        if not config.modes:
             return True
         
         # Check if current mode is in the enabled modes list
-        return self.settings.mode in enabled_modes
+        return self.settings.mode in config.modes
 
-    def _get_buffer_distance(self, config:Dict) -> list:
-        """Determine buffer distance for given mode and dataset or multiple distances if supplied"""
-        if 'buffer' in config:
-            buffer_config = config['buffer']
-        else:
-            return ['buffer_1m'] # Default to 1m buffer if not supplied in dataset matrix
+    def _get_buffer_list(self, config:Dict) -> list:
+        """Determine buffer distance or distances for given mode and dataset"""
         
         # If buffer is a string, return as-is regardless of mode
-        if isinstance(buffer_config, str):
-            return [f'buffer_{buffer_config}']
+        if isinstance(config.buffer, str):
+            return [f'buffer_{config.buffer}']
         
         # If buffer is a dict, get mode-specific value or values
-        if isinstance(buffer_config, dict):
-            return ['buffer_' + value for value in buffer_config.get(self.settings.mode, '1m')]
+        if isinstance(config.buffer, dict):
+            return ['buffer_' + value for value in config.buffer[self.settings.mode]]
         
-        # Fallback
-        return ['buffer_1m']
-
     def _is_point_dataset(self, dataset_path: str) -> bool:
         """Check if a dataset has point geometry"""
         try:
@@ -630,14 +683,15 @@ class ValuesChecker:
 # ============================================================================
 
 # USER CONFIGURATION
-INPUT_DATA = r"C:\data\gippsdap\Tambo_2324_DAP.shp"
+INPUT_DATA = r"C:\data\gippsdap\Tambo_2324_DAP_sample.shp"
 ID_FIELD = "DAP_REF_NO"
 NAME_FIELD = "DAP_NAME"
+DESCRIPTION_FIELD = "DESCRIPTIO"
 DISTRICT_FIELD = "DISTRICT"
 RISK_LEVEL_FIELD = "RISK_LVL"
 WORKSPACE = r"C:\data\temp"
-MODE = "JFMP"                                       # Options: "DAP", "JFMP", "NBFT", "LRLI"
-THEMES = ["forests", "biodiversity", "summary"]     # Options: "summary", "forests", "biodiversity", "water", "heritage"
+MODE = "JFMP"                                       # Options: "DAP", "JFMP", "NBFT"
+THEMES = ["forests", "biodiversity", "water", "heritage", "summary"]     # Options: "summary", "forests", "biodiversity", "water", "heritage"
 DISTRICT = None                                     # Optional: specify district name or leave as None
 VERBOSE_LOGGING = True                              # Set to True for detailed logging
 
