@@ -4,6 +4,8 @@
 
 """      
 Determines which fields are concatenated with '|' to form QBID
+
+!! NOTE: THIS IS JUNK FOR NOW, JUST EXPERIMENTING WITH DIFFERENT WAYS TO DERIVE QBID !!
 """
 QBID_MATRIX = {
             'JFMP': {
