@@ -87,10 +87,10 @@ DATASET_MATRIX = {
             'high_risk_only': True,
             'buffer': '10m',
             'where_clause': None,
-            'fields': ["NAME", "ASSET_CLS", "SERIAL_NO"],
-            'value_type': 'RECWEB SIGN',
-            'value_field': 'NAME',
-            'description_field': 'ASSET_CLS',
+            'fields': ["TYPE", "SERIAL_NO"],    # Removed 'NAME' as it doesn't exist. Why RECWEB inconsistency?
+            'value_type': 'RECWEB SIGN',        
+            'value_field': 'TYPE',              # Not sure?
+            'description_field': 'TYPE',        # Not sure?
             'id_field': 'SERIAL_NO'
         },
         'recweb_carpark': {

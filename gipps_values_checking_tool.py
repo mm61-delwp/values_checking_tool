@@ -264,16 +264,13 @@ class ValuesChecker:
         works_count = int(arcpy.GetCount_management(works_layer)[0])
         
         # Step 5: Perform spatial intersection
-        if values_count > 0:
+        if values_count > 0 and works_count > 0:
             intersect_output = f"intersect_{dataset_name}_{buffer_name}"
             intersect_result = arcpy.analysis.Intersect([works_layer, values_layer], intersect_output, "ALL")
             self.temp_datasets.append(intersect_output)
         else:
             self.logger.warning(f"No features after selection criteria: {dataset_name}, {config.where_clause}")
             return []
-        
-        # self.logger.info(f"Number of works features in {buffer_name}: {works_count}")
-        # self.logger.info(f"Number of values features in {dataset_name}: {values_count}")
 
         # Step 6: Extract and return results
         if intersect_result:
@@ -332,8 +329,8 @@ class ValuesChecker:
             'Value_Type': config.value_type,
             'Buffer': buffer_layer[7:], # Shorten buffer string, removing "buffer_" prefix,
             'Value': None,
-            'Value_Description': row[valid_fields.index(config.description_field)],
-            'Value_ID': row[valid_fields.index(config.description_field)] or None,
+            'Value_Description': None,
+            'Value_ID': None,
             'X': int(row[valid_fields.index('X')] or 0),
             'Y': int(row[valid_fields.index('Y')] or 0),
             'QBID': None,
@@ -342,7 +339,7 @@ class ValuesChecker:
             # Any remaining fields specified by 'fields' in values dataset configuration will be appended here
         }
         
-        # Add value field data from value field or fields
+        # Update value field data from value field or fields
         if isinstance(config.value_field, str): 
             # single value field; return single value to 'Value' field
             result['Value'] = row[valid_fields.index(config.value_field)]
@@ -353,12 +350,20 @@ class ValuesChecker:
                 vf_values.append(row[valid_fields.index(vf)])
             vf_string = ", ".join(str(item) for item in vf_values)
             result['Value'] = vf_string
+
+        # Update Value_ID field data from specified field, if specified
+        if config.id_field:
+            row[valid_fields.index(config.id_field)],
+        
+        # Update Value_Description field data from specified field, if specified
+        if config.description_field:
+            row[valid_fields.index(config.description_field)],
         
         # Add any aditional fields specified in dataset configuration
         for fieldname in config.fields:
             if fieldname not in result: 
-                if fieldname not in [config.value_field, config.id_field, config.description_field]:
-                    result[fieldname] = row[valid_fields.index(fieldname)]
+                if fieldname not in filter(None, [config.value_field, config.id_field, config.description_field]):
+                    result[fieldname] = row[valid_fields.index(fieldname)] or 'Field not found'
 
         # calculate quickbase id code
         result['QBID_Test'] = self._build_quickbase_id(result, theme)
