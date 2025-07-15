@@ -17,6 +17,8 @@ DATASET DEFINITIOINS:
             'id_field':             string (Optional) - unique identifier for value instance; must exist in fields (above)
         },
 
+        # Potential change: value field as single or multiple list for field, or string to pass through string?
+
 NOTE:   'buffer' can be:
             - a string, e.g. 'buffer: '1m' which will be applied to all modes
             - a dict, e.g. 'buffer': {'DAP': '1m', 'JFMP': '50m', 'NBFT': '1m'} which will apply the buffer depending on selected mode
@@ -269,7 +271,7 @@ DATASET_MATRIX = {
             'path': "{csdl}\\FLORAFAUNA1.GDB\\VBA_FLORA25",
             'buffer': {'DAP': '50m', 'JFMP': {'500m', '1000m_ring'}, 'NBFT': '50m'},
             'where_clause': "(STARTDATE > date '1980-01-01 00:00:00') AND (MAX_ACC_KM <= 0.5) AND (EPBC_DESC in ('Endangered','Vulnerable','Critically Endangered') OR OLD_VICADV in ('e','v','P','x') OR FFG in('cr','en','vu','th','cd','en-x','L'))",
-            'fields': ["SCI_NAME", "COMM_NAME", "TAXON_ID", "EXTRA_INFO", "RECORD_ID", "COLLECTOR", "FFG_DESC", "EPBC_DESC", "MAX_ACC_KM", "RECORD_ID", "STARTDATE"],
+            'fields': ["SCI_NAME", "COMM_NAME", "TAXON_ID", "RECORD_ID", "COLLECTOR", "FFG_DESC", "EPBC_DESC", "MAX_ACC_KM", "STARTDATE"],
             'value_type': 'Flora',
             'value_field': ['COMM_NAME', 'SCI_NAME'],
             'description_field': 'COMM_NAME',
@@ -279,7 +281,7 @@ DATASET_MATRIX = {
             'path': "{csdl_restricted}\\VBA_FLORA_THREATENED",
             'buffer': {'DAP': '50m', 'JFMP': {'500m', '1000m_ring'}, 'NBFT': '50m'},
             'where_clause': "(STARTDATE > date '1980-01-01 00:00:00') AND (MAX_ACC_KM <= 0.5)",
-            'fields': ["SCI_NAME", "COMM_NAME", "TAXON_ID", "EXTRA_INFO", "RECORD_ID", "COLLECTOR", "FFG_DESC", "EPBC_DESC", "MAX_ACC_KM", "RECORD_ID", "STARTDATE"],
+            'fields': ["SCI_NAME", "COMM_NAME", "TAXON_ID", "RECORD_ID", "COLLECTOR", "FFG_DESC", "EPBC_DESC", "MAX_ACC_KM", "STARTDATE"],
             'value_type': 'Flora_Threatened',
             'value_field': ['COMM_NAME', 'SCI_NAME'],
             'description_field': 'COMM_NAME',

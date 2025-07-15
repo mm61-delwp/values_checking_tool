@@ -317,7 +317,6 @@ class ValuesChecker:
         """Build the base result structure common to all themes"""
         result = {
             # Standard fields for all values datasets - from works feature class
-            # 'UNIQUE_ID': row[0],
             'UNIQUE_ID':   row[valid_fields.index(f'{ID_FIELD}')],
             'DISTRICT':    row[valid_fields.index(f'{DISTRICT_FIELD}')],
             'NAME':        row[valid_fields.index(f'{NAME_FIELD}')],
@@ -353,7 +352,7 @@ class ValuesChecker:
 
         # Update Value_ID field data from specified field, if specified
         if config.id_field:
-            row[valid_fields.index(config.id_field)],
+            row[valid_fields.index({config.id_field})],
         
         # Update Value_Description field data from specified field, if specified
         if config.description_field:
