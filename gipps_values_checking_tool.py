@@ -352,11 +352,11 @@ class ValuesChecker:
 
         # Update Value_ID field data from specified field, if specified
         if config.id_field:
-            row[valid_fields.index({config.id_field})],
+            result['Value_ID'] = row[valid_fields.index(config.id_field)]
         
         # Update Value_Description field data from specified field, if specified
         if config.description_field:
-            row[valid_fields.index(config.description_field)],
+            result['Value_Description'] = row[valid_fields.index(config.description_field)]
         
         # Add any aditional fields specified in dataset configuration
         for fieldname in config.fields:
