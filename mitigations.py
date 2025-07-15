@@ -20,12 +20,13 @@ FOREST_MITIGATIONS = {
 }
 
 HERITAGE_MITIGATIONS = {
-    ('LRLI', 'No', 'No'): "No known sites. Apply contingency plan if CH discovered. Remain in existing footprint",
-    ('LRLI', 'No', 'Yes'): "No known sites but culturally sensitive area. Use machinery caution. Apply contingency plan",
-    ('DAP', 'No', 'No'): "No known sites or sensitivity. Remain in disturbed footprint. Contingency plan on site",
-    ('DAP', 'No', 'Yes'): "Culturally sensitive area. Remain in disturbed footprint. Contingency plan on site",
-    ('DAP', 'Yes', 'No'): "Sites detected. Heritage specialist assessment required. Permit if harm unavoidable",
-    ('DAP', 'Yes', 'Yes'): "Sites and sensitivity detected. Heritage specialist assessment required. Permit if harm unavoidable"
+    # (risk_level, sites_exist, sensitivity)
+    ('LRLI', 'No',  'No' ): "No known sites. Apply contingency plan if CH discovered. Remain in existing footprint",
+    ('LRLI', 'No',  'Yes'): "No known sites but culturally sensitive area. Use machinery caution. Apply contingency plan",
+    ('DAP',  'No',  'No' ): "No known sites or sensitivity. Remain in disturbed footprint. Contingency plan on site",
+    ('DAP',  'No',  'Yes'): "Culturally sensitive area. Remain in disturbed footprint. Contingency plan on site",
+    ('DAP',  'Yes', 'No' ): "Sites detected. Heritage specialist assessment required. Permit if harm unavoidable",
+    ('DAP',  'Yes', 'Yes'): "Sites and sensitivity detected. Heritage specialist assessment required. Permit if harm unavoidable"
 }
 
 NATIVE_TITLE_MATRIX = {
@@ -35,3 +36,33 @@ NATIVE_TITLE_MATRIX = {
     'GLAWAC_FAA': "Future Act Rights Apply - Gunaikurnai Notices (Determination Area)",
     'OTHER_FAA': "Future Act Rights Apply - FNLRS Notices (Non-Determined)"
 }
+
+# Example including biodiversity risk register. How to maintain?
+MITIGATIONS = {
+    'JFMP': {
+        'biodiversity': {
+            'EVC': {
+                # Key = Value_Description (VEG_CODE)
+                'WPro0858': 'Autumn burning preferred for this EVC to maintain floristic diversity and avoiding impacts to annual species (obligate seeders).',
+                'EGL_0018': 'Avoid direct ignition during burning. This EVC contains riparian vegetation.',
+                'GipP0018': 'Avoid direct ignition during burning. This EVC contains riparian vegetation.'
+                },
+            'Flora': {
+                # KEY = Value_Description (TAXON_ID)
+                '500002': 'Exclude sites with records of this species from works associated with burning and roading. Ensure works do not alter current drainage patterns near records of this species.',
+                '500009': 'Exclude sites with records of this species from works associated with burning and roading. Ensure works do not alter current drainage patterns near records of this species.',
+                '500010': 'Exclude sites with records of this species from works associated with burning and roading. Establish buffer of 30m radius around record of this species to protect known populations from disturbance (earthworks, machinery and vehicles), in particular where plants occur on roadsides and are at risk of damage from vehicles. Ensure works do not alter current drainage patterns near records of this species.',
+            }
+        },
+    },
+    'DAP': {
+        'biodiversity': {},
+        'forests': {}
+    }
+}
+
+# Example option to remove hard-coded stuff from main script using multi-level lookup
+# MITIGATIONS = {
+#     ('JFMP', 'forests', 'biodiversity', 'EVC', Actual_EVC_goes_here): "Mitigation here",
+#     ('JFMP', 'forests', 'Flora', 'TAXON', Specific_taxon_goes_here): "Mitigation here"
+# }

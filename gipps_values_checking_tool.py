@@ -309,73 +309,57 @@ class ValuesChecker:
                     continue
                 
                 # Build result in desired format
-                result = self._build_result(row, valid_fields, config, theme, buffer_layer)
+                result = self._build_result_row(row, valid_fields, config, theme, buffer_layer)
                 
                 # add to output
                 results.append(result)
 
         return results
     
-    def _build_result(self, row: tuple, valid_fields: List[str], config: DatasetConfig, theme: str, buffer_layer: str) -> Dict:
+    def _build_result_row(self, row: tuple, valid_fields: List[str], config: DatasetConfig, theme: str, buffer_layer: str) -> Dict:
         """Build the base result structure common to all themes"""
         result = {
-            'UNIQUE_ID': row[0],
-            'DISTRICT': row[3] if len(row) > 3 else '',
-            'NAME': row[1] if len(row) > 1 else '',
-            'DESCRIPTION': row[2] if len(row) > 2 else '',
-            'RISK_LVL': row[4] if len(row) > 4 else '',
+            # Standard fields for all values datasets - from works feature class
+            # 'UNIQUE_ID': row[0],
+            'UNIQUE_ID':   row[valid_fields.index(f'{ID_FIELD}')],
+            'DISTRICT':    row[valid_fields.index(f'{DISTRICT_FIELD}')],
+            'NAME':        row[valid_fields.index(f'{NAME_FIELD}')],
+            'DESCRIPTION': row[valid_fields.index(f'{DESCRIPTION_FIELD}')],
+            'RISK_LVL':    row[valid_fields.index(f'{RISK_LEVEL_FIELD}')],
+
+            # Details of values - from overlapping values feature class
             'Theme': theme,
             'Value_Type': config.value_type,
             'Buffer': buffer_layer[7:], # Shorten buffer string, removing "buffer_" prefix,
             'Value': None,
-            'Value_Description': None,
-            'Value_ID': None,
-            'X': None,
-            'Y': None,
+            'Value_Description': row[valid_fields.index(config.description_field)],
+            'Value_ID': row[valid_fields.index(config.description_field)] or None,
+            'X': int(row[valid_fields.index('X')] or 0),
+            'Y': int(row[valid_fields.index('Y')] or 0),
             'QBID': None,
-            'QBID_Alt': None
+            'QBID_Alt': None,
+            'DATE_CHECKED': self.start_date
+            # Any remaining fields specified by 'fields' in values dataset configuration will be appended here
         }
         
         # Add value field data from value field or fields
-        if isinstance(config.value_field, str):
+        if isinstance(config.value_field, str): 
             # single value field; return single value to 'Value' field
-            value_field_idx = self._get_field_index(valid_fields, config.value_field)
-            if value_field_idx is not None and value_field_idx < len(row) and row[value_field_idx]:
-                result['Value'] = row[value_field_idx]
-        elif isinstance(config.value_field, list):
+            result['Value'] = row[valid_fields.index(config.value_field)]
+        elif isinstance(config.value_field, list): 
             # multiple value fields; concatenate into 'Value' field with ', ' separator
             vf_values = []
             for vf in config.value_field:
-                value_field_idx = self._get_field_index(valid_fields, vf)
-                if value_field_idx is not None and value_field_idx < len(row) and row[value_field_idx]:
-                    vf_values.append(row[value_field_idx])
+                vf_values.append(row[valid_fields.index(vf)])
             vf_string = ", ".join(str(item) for item in vf_values)
             result['Value'] = vf_string
-        
-        # Add description field if specified
-        if config.description_field:
-            desc_field_idx = self._get_field_index(valid_fields, config.description_field)
-            if desc_field_idx is not None and desc_field_idx < len(row) and row[desc_field_idx]:
-                result['Value_Description'] = row[desc_field_idx]
-        
-        # Add X and Y Coordinates (as integers)
-            result['X'] = int(row[self._get_field_index(valid_fields, 'X')] or 0)
-            result['Y'] = int(row[self._get_field_index(valid_fields, 'Y')] or 0)
-
-        # Add ID field if specified
-        if config.id_field:
-            id_field_idx = self._get_field_index(valid_fields, config.id_field)
-            if id_field_idx is not None and id_field_idx < len(row) and row[id_field_idx]:
-                result['Value_ID'] = row[id_field_idx]
         
         # Add any aditional fields specified in dataset configuration
         for fieldname in config.fields:
             if fieldname not in result: 
                 if fieldname not in [config.value_field, config.id_field, config.description_field]:
-                    id_field_idx = self._get_field_index(valid_fields, fieldname)
-                    if id_field_idx is not None and id_field_idx < len(row) and row[id_field_idx]:
-                        result[fieldname] = row[id_field_idx]
-        
+                    result[fieldname] = row[valid_fields.index(fieldname)]
+
         # calculate quickbase id code
         result['QBID_Test'] = self._build_quickbase_id(result, theme)
 

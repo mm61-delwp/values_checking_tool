@@ -5,13 +5,13 @@
 """      
 DATASET DEFINITIOINS:
     'name': {
-            'path': string datapath to values layer
+            'path':                 string (required) - datapath to values layer
             'high_risk_only':       bool (Optional) - if True, do not process for LRLI activities; default is False
             'modes':                list (Optional) - If list populated, layer will only be processed for listed modes
             'buffer':               string or dict (Optional) - See note above; default value is '1m'
             'where_clause':         string (Optional) - SQL type selection for values; default is None
-            'fields':               list - field names to include in summary
-            'value_type':           string - description of value type for all values in layer
+            'fields':               list (required) - field names to include in summary
+            'value_type':           string (required) - description of value type for all values in layer
             'value_field':          string or list (Optional) - field name of main value field; must exist in fields (above)     
             'description_field':    string (Optional) - field name of description field; must exist in fields (above)
             'id_field':             string (Optional) - unique identifier for value instance; must exist in fields (above)
