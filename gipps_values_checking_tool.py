@@ -227,7 +227,7 @@ class ValuesChecker:
 
                 if self._is_dataset_enabled_for_mode(config):
                     for buffer in self._get_buffer_list(config):
-                        dataset_results = self._process_single_dataset(dataset_name, config, buffer, buffered_layers, theme)
+                        dataset_results = self._process_single_dataset(dataset_name, config, buffer, theme)
                         all_theme_results.extend(dataset_results)
                         self.logger.info(f"Processed {dataset_name} with {buffer[7:]} buffer: {len(dataset_results)} values found")
                 else:
@@ -237,8 +237,7 @@ class ValuesChecker:
 
         return all_theme_results
     
-    def _process_single_dataset(self, dataset_name: str, config: DatasetConfig, 
-                           buffer_name: str, buffered_layers: Dict[str, str], theme: str) -> List[Dict]:
+    def _process_single_dataset(self, dataset_name: str, config: DatasetConfig, buffer_name: str, theme: str) -> List[Dict]:
         """Process a single dataset using its configuration"""
         
         # Step 1: Resolve dataset path and check existence
