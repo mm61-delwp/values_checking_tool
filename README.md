@@ -1,2 +1,2 @@
-# values_checking_tool
-Gippsland Values Checking Tool
+# Gippsland Values Checking
+Values checking script/toolbox for Gippsland region
